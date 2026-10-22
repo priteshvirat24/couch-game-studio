@@ -69,12 +69,12 @@ The TV is the biggest screen in the house, and it's the one kids only ever *watc
  Phone (any browser)          Studio server (Node)                 Fire TV (Vega OS)
  ───────────────────          ─────────────────────                ──────────────────
  voice / text / photo ──────► POST /api/games ──► Amazon Bedrock   React Native for Vega app
- remix requests               (Claude, tool use)  ─► GameSpec      └─ @amazon-devices/webview
+ remix requests               (LLM, tool use)     ─► GameSpec      └─ @amazon-devices/webview
  controller buttons ─ ws ───► room relay ── ws ───────────────────► TV app (D-pad UI + engine)
                               Family Arcade (JSON store)            canvas engine, 60 fps
 ```
 
-- `server/llm.js` is the AI layer, with a provider chain: **Amazon Bedrock** (Claude via the Converse API with a `make_game` tool), then the **Claude API** (Anthropic SDK with structured JSON output), then an **offline designer**. Every path ends in `normalizeSpec()`.
+- `server/llm.js` is the AI layer, with a provider chain: **Amazon Bedrock** (Converse API with a `make_game` tool), then the **Anthropic API** (official SDK with structured JSON output), then an **offline designer**. Every path ends in `normalizeSpec()`.
 - `server/spec.js` is the GameSpec schema and validator, plus the offline designer. The offline designer is keyword-based and uses the open `emojilib` dictionary, so "flies", "logs" and "gears" become sprites. The demo keeps working with no network or AI credentials.
 - `public/engine/engine.js` is a dependency-free canvas engine. It has 4 genres, 12 modifiers, multiplayer, particles, a night-mode lighting pass, and WebAudio sound effects.
 - `public/tv/` is the 10-foot TV app. `public/phone/` is the phone companion.
@@ -94,11 +94,11 @@ Open `http://localhost:8787/tv/` in a browser (arrow keys and Enter act as the r
 **AI providers** (optional; without them the offline designer is used):
 
 ```bash
-# Amazon Bedrock (default model: us.anthropic.claude-opus-5-5)
+# Amazon Bedrock (pick any tool-use model with BEDROCK_MODEL_ID)
 export AWS_REGION=us-east-1          # plus your usual AWS credentials
-# or the Claude API
+# or the Anthropic API
 export ANTHROPIC_API_KEY=...
-# force a provider: LLM_PROVIDER=bedrock | claude | offline
+# force a provider: LLM_PROVIDER=bedrock | anthropic | offline
 ```
 
 **A public HTTPS link** lets phones on any network join and enables voice input:
@@ -132,8 +132,8 @@ npm test     # GameSpec validation, the offline designer, remixes, seed games
 ## Built with
 
 - **Fire TV / Vega OS:** React Native for Vega, `@amazon-devices/webview`, the Vega CLI and Vega Virtual Device.
-- **AWS:** Amazon Bedrock (Converse API, tool use) running Anthropic Claude.
-- **Claude API** via `@anthropic-ai/sdk`, with structured outputs as the fallback provider.
+- **AWS:** Amazon Bedrock (Converse API, tool use).
+- **Anthropic API** via `@anthropic-ai/sdk`, with structured outputs as the fallback provider.
 - Node.js, Express, `ws`, `qrcode`.
 - [Twemoji](https://github.com/jdecked/twemoji) graphics (CC-BY 4.0). [emojilib](https://github.com/muan/emojilib) keywords (MIT).
 - Cloudflare quick tunnels for HTTPS phone links.

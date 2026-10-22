@@ -32,7 +32,7 @@
 - Sharing family-made games between households.
 
 ## Built with
-`vega-os` `react-native-for-vega` `amazon-devices-webview` `fire-tv` `amazon-bedrock` `anthropic-claude` `aws-sdk` `node.js` `express` `websockets` `canvas` `web-audio` `emojilib` `twemoji` `cloudflare-tunnel`
+`vega-os` `react-native-for-vega` `amazon-devices-webview` `fire-tv` `amazon-bedrock` `aws-sdk` `node.js` `express` `websockets` `canvas` `web-audio` `emojilib` `twemoji` `cloudflare-tunnel`
 
 ## Repo, video and links
 - **GitHub repo:** https://github.com/priteshvirat24/couch-game-studio (public, Apache-2.0)
@@ -44,13 +44,13 @@ Yes. Everything in this repository was built during the submission window (Octob
 ---
 
 ## AWS Builder mini challenge
-**Services used:** Amazon Bedrock Runtime (Converse API) running Anthropic Claude (`us.anthropic.claude-opus-5-5` inference profile), called from `server/llm.js` with `@aws-sdk/client-bedrock-runtime`.
+**Services used:** Amazon Bedrock Runtime (Converse API, tool use, cross-region inference profiles), called from `server/llm.js` with `@aws-sdk/client-bedrock-runtime`.
 
 **How it works:**
 - The kid's sentence goes to Bedrock's Converse API with a `make_game` tool whose input schema *is* the GameSpec JSON Schema (`server/spec.js`).
-- Claude's tool input is validated and clamped by `normalizeSpec()` and then runs directly on the TV engine.
-- Remixes send the current spec plus the instruction, and Claude returns the full updated spec.
-- The provider chain backs off for 60 s after an account or permission error and falls through to the Claude API, then the offline designer, so the TV never hangs.
+- The model's tool input is validated and clamped by `normalizeSpec()` and then runs directly on the TV engine.
+- Remixes send the current spec plus the instruction, and the model returns the full updated spec.
+- The provider chain backs off for 60 s after an account or permission error and falls through to the Anthropic API, then the offline designer, so the TV never hangs.
 
 ## Open Source mini challenge
 - **Repo URL:** https://github.com/priteshvirat24/couch-game-studio
@@ -81,9 +81,9 @@ Yes. Everything in this repository was built during the submission window (Octob
 - *Needs work:* HTTP is blocked by default since WebView 4.0.2, which also blocks pointing at a LAN dev server. A documented, debug-only "allow local HTTP" switch would save every web developer a tunnel.
 
 **Amazon Bedrock**
-- *Used for:* Claude via the Converse API with tool use, to turn a kid's sentence into a validated game spec.
+- *Used for:* the Converse API with tool use, to turn a kid's sentence into a validated game spec.
 - *Worked well:* tool `inputSchema` maps one-to-one to our JSON Schema, and inference profiles make model choice a single string.
-- *Needs work:* a brand-new account under verification returned *different* errors per region: "Operation not allowed" in us-east-1/us-west-2/eu-north-1, but "Your account is currently being verified" in eu-central-1. The clear message should appear everywhere. Also, newer Claude models reject forced `toolChoice`, which isn't obvious from the Converse docs.
+- *Needs work:* a brand-new account under verification returned *different* errors per region: "Operation not allowed" in us-east-1/us-west-2/eu-north-1, but "Your account is currently being verified" in eu-central-1. The clear message should appear everywhere. Also, some newer models reject forced `toolChoice`, which isn't obvious from the Converse docs.
 - *Would build again:* yes.
 
 ---
@@ -96,8 +96,8 @@ Yes. Everything in this repository was built during the submission window (Octob
 | 2 | Install Vega dependencies on macOS | Ran the documented `brew install binutils coreutils gawk findutils grep jq lz4 gnu-sed watchman` | Bottled installs in minutes | Intel macOS 26 has no bottles; gmp alone compiled for 11 min; watchman would take hours | Medium | Cancelled brew and ran the installer with the system `/usr/bin/jq` (macOS 15+) | Mark which dependencies are required by the installer versus by builds; detect system `jq` |
 | 3 | Load the TV app from a local dev server | Pointed WebView at `http://<LAN-IP>:8787` | Local dev over HTTP works in debug builds | HTTP is blocked by default since WebView 4.0.2 | Medium | Cloudflare quick tunnel (HTTPS) | A debug-only allow-list for LAN/loopback HTTP, or document a VVD-to-host loopback address |
 | 4 | Read the Vega install docs with an AI coding agent | `curl` / Jina reader on developer.amazon.com docs | Static HTML with code blocks | The page body is client-rendered; scripts get no commands | Low | Headless browser to extract code blocks | Server-render the docs or publish an `llms.txt` / markdown mirror |
-| 5 | Call Claude on Bedrock from a new AWS account | `converse` in several regions | One clear "account verification pending" error | "Operation not allowed" in most regions, the real reason only in eu-central-1 | High | Built a provider chain (Bedrock → Claude API → offline designer) | Return the verification message consistently in every region |
-| 6 | Force structured tool output on Claude via Bedrock | `toolChoice: {tool: {name}}` with a current Claude model | Forced tool call | Newer models reject forced tool choice | Low | `toolChoice: auto` plus instruction, with JSON-text fallback | Note model-specific `toolChoice` support in the Converse docs |
+| 5 | Call a model on Bedrock from a new AWS account | `converse` in several regions | One clear "account verification pending" error | "Operation not allowed" in most regions, the real reason only in eu-central-1 | High | Built a provider chain (Bedrock → Anthropic API → offline designer) | Return the verification message consistently in every region |
+| 6 | Force structured tool output via Bedrock | `toolChoice: {tool: {name}}` with a current model | Forced tool call | Newer models reject forced tool choice | Low | `toolChoice: auto` plus instruction, with JSON-text fallback | Note model-specific `toolChoice` support in the Converse docs |
 
 ## Feature requests (optional)
 1. **Voice input API for third-party Vega apps** (Fire TV remote mic to app speech-to-text). *Critical* for kids' creative apps: kids can't type, and the remote is in their hand.

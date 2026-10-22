@@ -12,9 +12,9 @@ import { SPEC_JSON_SCHEMA, GENRE_HELP, MODIFIERS, normalizeSpec, offlineSpec, of
 
 const BEDROCK_REGION = process.env.BEDROCK_REGION || process.env.AWS_REGION || 'us-east-1';
 const BEDROCK_MODEL = process.env.BEDROCK_MODEL_ID || 'us.anthropic.claude-opus-5-5';
-const CLAUDE_MODEL = process.env.CLAUDE_MODEL || 'claude-opus-5-5';
+const CLAUDE_MODEL = process.env.ANTHROPIC_MODEL || process.env.CLAUDE_MODEL || 'claude-opus-5-5';
 const TIMEOUT_MS = Number(process.env.LLM_TIMEOUT_MS || 30000);
-const MODE = process.env.LLM_PROVIDER || 'auto'; // auto | bedrock | claude | offline
+const MODE = process.env.LLM_PROVIDER === 'anthropic' ? 'claude' : process.env.LLM_PROVIDER || 'auto'; // auto | bedrock | anthropic | offline
 const HAS_CLAUDE_KEY = !!(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN);
 
 const bedrock = new BedrockRuntimeClient({ region: BEDROCK_REGION });
