@@ -119,7 +119,7 @@ function applyScreen(screen, gameId, title, genre) {
   $('remixTitle').textContent = state.title ? `“${state.title}”` : 'this game';
   if (state.genre) {
     $('pad').dataset.genre = state.genre;
-    $('actionBtn').textContent = { runner: 'JUMP', shooter: 'ZAP', catcher: 'GO', maze: 'GO' }[state.genre] || 'GO';
+    $('actionBtn').textContent = { runner: 'Jump', shooter: 'Zap', catcher: 'Go', maze: 'Go' }[state.genre] || 'GO';
   }
   // Only name a game while one is actually on the TV (not a stale one from before).
   $('padTitle').textContent = screen === 'play'

@@ -157,6 +157,7 @@ function artHtml(spec, big = false) {
 }
 
 const GENRE_LABEL = { catcher: 'Catch', runner: 'Run & Jump', maze: 'Maze', shooter: 'Zap' };
+const GENRE_ICON = { catcher: 'star', runner: 'up', maze: 'dpad', shooter: 'bolt' };
 
 function renderArcade() {
   const shelf = $('shelf');
@@ -170,9 +171,8 @@ function renderArcade() {
   for (const g of state.games) {
     cards.push(`<div class="game-card focusable" role="button" data-id="${esc(g.id)}" aria-label="${esc(`${g.title}, by ${g.author}`)}">
       <div class="art">${artHtml({ ...g, hero: g.hero, theme: g.theme, genre: g.genre })}</div>
-      <div class="badge">${esc(GENRE_LABEL[g.genre] || g.genre)}</div>
       ${state.freshIds.has(g.id) ? '<div class="fresh">NEW</div>' : ''}
-      <div class="meta"><div class="title">${esc(g.title)}</div><div class="by">by ${esc(g.author)}${g.remixOf ? ' · remix' : ''}</div>${g.best ? `<div class="best">${icon('trophy', { size: 24 })}<span>${esc(g.best.name)}</span> · ${g.best.score}</div>` : ''}</div>
+      <div class="meta"><div class="title">${esc(g.title)}</div><div class="by"><span class="genre">${esc(GENRE_LABEL[g.genre] || g.genre)}</span> · by ${esc(g.author)}${g.remixOf ? ' · remix' : ''}</div>${g.best ? `<div class="best">${icon('trophy', { size: 24 })}<span>${esc(g.best.name)}</span> · ${g.best.score}</div>` : ''}</div>
       <div class="go">${icon('play', { size: 22 })}Play</div>
     </div>`);
   }
@@ -197,6 +197,7 @@ const SURPRISES = [
 
 // --------------------------------------------------------------- create
 const STEPS = ['Reading your idea', 'Painting the world', 'Teaching the baddies', 'Robots testing the fun'];
+const STEP_MS = 1000;
 const QUOTE_WORDS = 28; // long ideas are trimmed on screen so the steps stay visible
 let stepTimer = null;
 let failTimer = null;
@@ -217,22 +218,22 @@ function showCreating(prompt, author, remix) {
   quote.classList.toggle('long', words.length > 12);
   quote.classList.toggle('longer', words.length > 20);
   quote.innerHTML = `<span class="mark">“</span>${words.map((w, i) => `<span class="w" style="animation-delay:${(i * 0.09).toFixed(2)}s">${esc(w)}</span>`).join(' ')}<span class="w mark" style="animation-delay:${(words.length * 0.09).toFixed(2)}s">”</span>`;
+  // One track in four parts. The last part keeps creeping until the game arrives, however long the model takes.
   const steps = $('createSteps');
-  steps.innerHTML = STEPS.slice(0, 4).map((t) => `<div class="step"><span class="bullet">${icon('sparkles', { size: 20 })}</span>${t}</div>`).join('');
+  steps.style.setProperty('--step-ms', `${STEP_MS}ms`);
+  steps.innerHTML = STEPS.map((t, k) => `<div class="step${k === STEPS.length - 1 ? ' last' : ''}"><span class="track"><i></i></span>${t}</div>`).join('');
   let i = 0;
   clearInterval(stepTimer);
   const tick = () => {
-    const els = [...steps.children];
-    els.forEach((el, k) => {
+    [...steps.children].forEach((el, k) => {
       el.classList.toggle('done', k < i);
       el.classList.toggle('now', k === i);
-      if (k < i) el.querySelector('.bullet').innerHTML = icon('check', { size: 20 });
     });
-    if (i < els.length) i += 1;
-    else clearInterval(stepTimer); // every step is lit: nothing left to animate
+    if (i < STEPS.length - 1) i += 1;
+    else clearInterval(stepTimer);
   };
   tick();
-  stepTimer = setInterval(tick, 850);
+  stepTimer = setInterval(tick, STEP_MS);
   show('creating');
   sfx.unlock();
   sfx.tone(440, 0.4, { type: 'sine', vol: 0.08, slide: 440 });
@@ -300,7 +301,7 @@ async function openIntro(gameOrId) {
   state.current = game;
   const s = game.spec;
   $('introArt').innerHTML = artHtml(s, true);
-  $('introGenre').textContent = GENRE_LABEL[s.genre] || s.genre;
+  $('introGenre').innerHTML = `${icon(GENRE_ICON[s.genre] || 'gamepad', { size: 30 })}${esc(GENRE_LABEL[s.genre] || s.genre)}`;
   $('introTitle').textContent = s.title;
   $('introTitle').classList.toggle('long', s.title.length > 24);
   $('introTagline').textContent = s.tagline;
@@ -336,7 +337,7 @@ function renderPodium(el, scores, highlightAt, record) {
 // One short burst of confetti, only when someone wins.
 function celebrate() {
   const box = $('confetti');
-  const colors = ['#ffd166', '#06d6a0', '#ff6b81', '#4cc9f0', '#c77dff'];
+  const colors = ['#ffd166', '#06d6a0', '#ff6b81', '#4cc9f0', '#ff9f43'];
   box.innerHTML = Array.from({ length: 70 }, (_, i) => {
     const left = Math.random() * 100;
     const delay = Math.random() * 0.6;
@@ -349,7 +350,8 @@ function celebrate() {
 
 // Who's on the couch right now, for the scoreboard.
 function teamName() {
-  const names = [...state.phones.values()].map((p) => p.name).filter((n) => n && n !== 'Player');
+  // Two phones can share a name (siblings, a re-joined phone): list each name once.
+  const names = [...new Set([...state.phones.values()].map((p) => p.name).filter((n) => n && n !== 'Player'))];
   if (!names.length) return 'Family';
   return names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} & ${names.at(-1)}`;
 }
@@ -392,6 +394,7 @@ function onGameEvent(e) {
     say(e.won ? `You did it! ${s.narration.win}` : `So close! ${s.narration.lose}`);
     sendWs({ t: 'reaction', text: e.won ? '🎉 You won!' : '😅 Try again!' });
     const rec = state.current;
+    if (!e.won && !e.score) return; // nothing scored: no podium entry
     api(`/api/games/${rec.id}/scores`, { method: 'POST', body: { name: teamName(), score: e.score, won: e.won, seconds } })
       .then(({ rank, scores }) => {
         rec.scores = scores;
@@ -432,6 +435,9 @@ function toast(text) {
 function activate(el) {
   if (!el) return;
   sfx.unlock();
+  // A short dip on OK so the press feels heard (the CSS keeps it to 80ms).
+  el.classList.add('pressed');
+  setTimeout(() => el.classList.remove('pressed'), 120);
   if (state.screen === 'arcade') {
     if (el.dataset.act === 'surprise') return surprise();
     if (el.dataset.id) return openIntro(el.dataset.id).catch(() => {});

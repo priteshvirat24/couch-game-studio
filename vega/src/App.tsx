@@ -104,13 +104,13 @@ export const App = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#12102b'},
-  webview: {backgroundColor: '#12102b'},
-  offline: {flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#12102b', padding: 80},
+  container: {flex: 1, backgroundColor: '#0c1322'},
+  webview: {backgroundColor: '#0c1322'},
+  offline: {flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0c1322', padding: 80},
   emoji: {fontSize: 120},
-  title: {color: '#fff8ec', fontSize: 64, fontWeight: '700', marginTop: 24},
-  body: {color: '#b9b3e0', fontSize: 34, marginTop: 18, textAlign: 'center', maxWidth: 1300},
+  title: {color: '#f7f5f0', fontSize: 64, fontWeight: '700', marginTop: 24},
+  body: {color: '#c8d0df', fontSize: 34, marginTop: 18, textAlign: 'center', maxWidth: 1300},
   button: {marginTop: 48, backgroundColor: '#ffd166', borderRadius: 999, paddingHorizontal: 64, paddingVertical: 22},
   buttonText: {color: '#2b1d00', fontSize: 40, fontWeight: '700'},
-  detail: {color: '#6f6a99', fontSize: 22, marginTop: 36},
+  detail: {color: '#7d8aa3', fontSize: 22, marginTop: 36},
 });

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="dark">
-  <meta name="theme-color" content="#110f2a">
+  <meta name="theme-color" content="#0c1322">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -30,9 +30,14 @@
       <p class="muted">So the TV knows who imagined the game.</p>
     </div>
     <label class="sr-only" for="nameInput">Your name</label>
-    <input id="nameInput" maxlength="16" placeholder="Maya" autocomplete="given-name" enterkeyhint="go">
+    <input id="nameInput" maxlength="16" placeholder="Your name" autocomplete="given-name" enterkeyhint="go">
     <button class="big-btn primary" id="joinBtn"><span data-icon="play" data-size="22"></span>Let’s play</button>
     <p class="muted small center">Room <b id="roomLabel"></b></p>
+    <ul class="how-list">
+      <li><span data-icon="mic" data-size="22"></span><span><b>Say any game you imagine.</b> Silly is good.</span></li>
+      <li><span data-icon="sparkles" data-size="22"></span><span><b>The TV builds it</b> and robots test it, in seconds.</span></li>
+      <li><span data-icon="gamepad" data-size="22"></span><span><b>Play it together</b> with this phone as the controller.</span></li>
+    </ul>
   </main>
 
   <!-- CREATE -->
@@ -55,7 +60,7 @@
       <div class="ideas" id="ideas"></div>
 
       <div class="hero-pick">
-        <label class="photo-btn" for="photoInput"><span data-icon="camera" data-size="24"></span><span><b>Draw your hero</b><small>Snap a drawing or a photo. It becomes the star of the game.</small></span></label>
+        <label class="photo-btn" for="photoInput"><span data-icon="camera" data-size="30"></span><span><b>Draw your hero</b><small>Snap a drawing or a photo. It becomes the star of the game.</small></span></label>
         <input type="file" id="photoInput" accept="image/*" capture="environment" hidden>
         <div class="photo-preview hidden" id="photoPreview">
           <canvas id="photoCanvas" width="256" height="256" aria-label="Your hero picture"></canvas>
@@ -86,12 +91,12 @@
       <div class="pad-title" id="padTitle" aria-live="polite">Waiting for a game on the TV…</div>
       <div class="pad" id="pad" data-genre="catcher">
         <div class="pad-dpad">
-          <button class="pb up" data-a="up" aria-label="Up"><span data-icon="up" data-size="34"></span></button>
-          <button class="pb left" data-a="left" aria-label="Left"><span data-icon="left" data-size="34"></span></button>
-          <button class="pb right" data-a="right" aria-label="Right"><span data-icon="right" data-size="34"></span></button>
-          <button class="pb down" data-a="down" aria-label="Down"><span data-icon="down" data-size="34"></span></button>
+          <button class="pb up" data-a="up" aria-label="Up"><span data-icon="up" data-size="44"></span></button>
+          <button class="pb left" data-a="left" aria-label="Left"><span data-icon="left" data-size="44"></span></button>
+          <button class="pb right" data-a="right" aria-label="Right"><span data-icon="right" data-size="44"></span></button>
+          <button class="pb down" data-a="down" aria-label="Down"><span data-icon="down" data-size="44"></span></button>
         </div>
-        <button class="pb action" data-a="action" id="actionBtn">JUMP</button>
+        <button class="pb action" data-a="action" id="actionBtn">Jump</button>
       </div>
       <div class="cheers" id="cheers" role="group" aria-label="Cheer on the TV">
         <button data-emoji="🎉" aria-label="Party">🎉</button><button data-emoji="😂" aria-label="Laugh">😂</button><button data-emoji="👏" aria-label="Clap">👏</button>
