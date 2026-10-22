@@ -17,13 +17,14 @@
           <div class="logo">🛋️🎮</div>
           <div>
             <h1>Couch Game Studio</h1>
-            <p class="sub">Say it. Draw it. Play it on the big screen.</p>
+            <p class="sub">Imagine a game. Say it. Play it on the big screen.</p>
+            <button class="pill-btn focusable" id="btnTts" aria-pressed="true">🔊 Read aloud: on</button>
           </div>
         </div>
         <div class="join-card" id="joinCard">
           <img id="qr" alt="Scan to join" width="150" height="150">
           <div class="join-text">
-            <div class="join-title">Make a game with your phone</div>
+            <div class="join-title">Imagine a game? Make it with your phone</div>
             <div class="join-url">Scan, or open <b id="joinUrl">…</b></div>
             <div class="join-code">Room <span id="roomCode">····</span></div>
             <div class="players" id="playerChips"></div>
@@ -44,6 +45,7 @@
           <div class="orb"></div><div class="orb o2"></div><div class="orb o3"></div>
         </div>
         <div class="steps" id="createSteps"></div>
+        <div class="create-error hidden" id="createError"></div>
       </div>
     </section>
 
@@ -58,19 +60,35 @@
           <p class="narration" id="introNarration"></p>
           <div class="how" id="introHow"></div>
           <div class="cast" id="introCast"></div>
+          <div class="tested" id="introTested"></div>
+          <div class="board" id="introBoard"></div>
           <div class="byline" id="introBy"></div>
           <div class="buttons">
             <button class="btn primary focusable" id="btnPlay">▶ Play</button>
             <button class="btn focusable" id="btnBack">Arcade</button>
+            <button class="btn subtle focusable" id="btnHide" title="Grown-ups: remove from the arcade">🗑</button>
           </div>
         </div>
       </div>
     </section>
 
+    <!-- CONFIRM (grown-ups) -->
+    <div class="modal hidden" id="confirm" role="dialog" aria-modal="true">
+      <div class="modal-card">
+        <h2 id="confirmTitle">Remove this game?</h2>
+        <p id="confirmText">It disappears from the Family Arcade. Grown-ups can bring it back later.</p>
+        <div class="buttons">
+          <button class="btn focusable" data-confirm="no">Keep it</button>
+          <button class="btn danger focusable" data-confirm="yes">Remove</button>
+        </div>
+      </div>
+    </div>
+
     <!-- PLAY -->
     <section id="play" class="screen">
       <canvas id="canvas" width="1280" height="720"></canvas>
       <div class="toast" id="toast"></div>
+      <div class="reactions" id="reactions" aria-hidden="true"></div>
       <div class="pause-menu hidden" id="pauseMenu">
         <h2>Paused</h2>
         <button class="btn primary focusable" data-act="resume">Resume</button>
@@ -87,6 +105,7 @@
         <h2 id="endTitle">You win!</h2>
         <p id="endLine"></p>
         <div class="end-score" id="endScore"></div>
+        <div class="board end-board" id="endBoard"></div>
         <div class="buttons">
           <button class="btn primary focusable" id="btnAgain">Play again</button>
           <button class="btn focusable" id="btnEndArcade">Arcade</button>

@@ -64,9 +64,15 @@ function connect() {
       overlay(false);
       buzz([30, 40, 30]);
       toast(`“${m.game.title}” is on the TV!`);
+      const t = m.game.playtest;
+      const r = $('makeResult');
+      r.textContent = t
+        ? `🤖 Our robots played “${m.game.title}” ${t.runs} times: kids won ${Math.round(t.kidWinRate * 100)}% of the time.${t.changes?.length ? ` We ${t.changes.join(' and ')}.` : ''}`
+        : `“${m.game.title}” is ready on the TV!`;
+      r.classList.add('show');
     } else if (m.t === 'create_failed') {
       overlay(false);
-      toast('That one fizzled. Try again!');
+      toast(m.error || 'That one fizzled. Try again!');
     } else if (m.t === 'reaction') {
       toast(m.text);
       buzz(40);
@@ -131,7 +137,7 @@ function setupMic(btn, label, input, idleText) {
     rec.start();
   });
 }
-setupMic($('micBtn'), $('micLabel'), $('promptInput'), 'Tap and tell me your idea');
+setupMic($('micBtn'), $('micLabel'), $('promptInput'), 'Tap and tell me. Anything goes!');
 setupMic($('remixMicBtn'), $('remixMicLabel'), $('remixInput'), '“make it faster”');
 
 // --------------------------------------------------------------- ideas
@@ -222,6 +228,7 @@ $('makeBtn').addEventListener('click', async () => {
   if (prompt.length < 3) { toast('Tell me your game idea first!'); return; }
   if (state.busy) return;
   overlay(true, 'Making your game…');
+  $('makeResult').classList.remove('show');
   buzz(30);
   try {
     await post('/api/games', { prompt, author: state.name, room, heroImage: state.heroImage });
@@ -263,6 +270,16 @@ for (const b of document.querySelectorAll('.pb')) {
   b.addEventListener('contextmenu', (e) => e.preventDefault());
 }
 for (const b of document.querySelectorAll('[data-nav]')) b.addEventListener('click', () => { send({ t: 'nav', action: b.dataset.nav }); buzz(); });
+
+// Cheer: emoji float up on the TV (throttled so nobody floods the screen).
+let lastCheer = 0;
+$('cheers').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-emoji]');
+  if (!b || Date.now() - lastCheer < 400) return;
+  lastCheer = Date.now();
+  send({ t: 'react', emoji: b.dataset.emoji });
+  buzz(12);
+});
 
 // ----------------------------------------------------------------- boot
 if (!room) {

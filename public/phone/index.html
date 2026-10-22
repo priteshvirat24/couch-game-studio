@@ -4,6 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <meta name="theme-color" content="#12102b">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/assets/icon-192.png">
   <title>Couch Game Studio</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap">
@@ -33,10 +38,10 @@
     </nav>
 
     <section class="panel active" id="panel-make">
-      <h2>Describe your game</h2>
+      <h2>What game do you imagine?</h2>
       <div class="mic-wrap">
         <button class="mic" id="micBtn" aria-label="Talk"><span>🎤</span></button>
-        <div class="mic-label" id="micLabel">Tap and tell me your idea</div>
+        <div class="mic-label" id="micLabel">Tap and tell me. Anything goes!</div>
       </div>
       <textarea id="promptInput" rows="3" maxlength="400" placeholder="My dog Biscuit catches falling tacos but has to dodge broccoli"></textarea>
       <div class="ideas" id="ideas"></div>
@@ -53,6 +58,7 @@
         </div>
       </div>
       <button class="big-btn primary" id="makeBtn">✨ Make my game!</button>
+      <div class="result" id="makeResult" role="status"></div>
     </section>
 
     <section class="panel" id="panel-remix">
@@ -77,6 +83,10 @@
           <button class="pb down" data-a="down">▼</button>
         </div>
         <button class="pb action" data-a="action" id="actionBtn">JUMP</button>
+      </div>
+      <div class="cheers" id="cheers" aria-label="Cheer on the TV">
+        <button data-emoji="🎉">🎉</button><button data-emoji="😂">😂</button><button data-emoji="👏">👏</button>
+        <button data-emoji="🔥">🔥</button><button data-emoji="😱">😱</button><button data-emoji="❤️">❤️</button>
       </div>
       <div class="pad-nav">
         <button class="small-btn" data-nav="pause">⏸ Pause</button>
