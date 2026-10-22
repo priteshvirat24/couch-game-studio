@@ -1,0 +1,8 @@
+node_modules/
+data/
+.DS_Store
+vega/node_modules/
+vega/build/
+vega/dist/
+*.vpkg
+*.log

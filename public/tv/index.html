@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=1920, initial-scale=1">
+  <title>Couch Game Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap">
+  <link rel="stylesheet" href="tv.css">
+</head>
+<body>
+  <div id="stage">
+    <!-- ARCADE / HOME -->
+    <section id="arcade" class="screen active" aria-label="Family Arcade">
+      <header class="top">
+        <div class="brand">
+          <div class="logo">🛋️🎮</div>
+          <div>
+            <h1>Couch Game Studio</h1>
+            <p class="sub">Say it. Draw it. Play it on the big screen.</p>
+          </div>
+        </div>
+        <div class="join-card" id="joinCard">
+          <img id="qr" alt="Scan to join" width="150" height="150">
+          <div class="join-text">
+            <div class="join-title">Make a game with your phone</div>
+            <div class="join-url">Scan, or open <b id="joinUrl">…</b></div>
+            <div class="join-code">Room <span id="roomCode">····</span></div>
+            <div class="players" id="playerChips"></div>
+          </div>
+        </div>
+      </header>
+      <h2 class="shelf-title">Family Arcade</h2>
+      <div class="shelf" id="shelf"></div>
+      <footer class="hint"><span class="key">◀ ▶</span> browse <span class="key">OK</span> play <span class="dot">•</span> Phones join as extra players</footer>
+    </section>
+
+    <!-- CREATING -->
+    <section id="creating" class="screen" aria-live="polite">
+      <div class="creating-inner">
+        <div class="quote-by" id="createBy">Maya says</div>
+        <blockquote id="createQuote">“…”</blockquote>
+        <div class="magic">
+          <div class="orb"></div><div class="orb o2"></div><div class="orb o3"></div>
+        </div>
+        <div class="steps" id="createSteps"></div>
+      </div>
+    </section>
+
+    <!-- INTRO -->
+    <section id="intro" class="screen">
+      <div class="intro-card" id="introCard">
+        <div class="intro-art" id="introArt"></div>
+        <div class="intro-body">
+          <div class="pill" id="introGenre">catcher</div>
+          <h2 id="introTitle">Title</h2>
+          <p class="tagline" id="introTagline"></p>
+          <p class="narration" id="introNarration"></p>
+          <div class="how" id="introHow"></div>
+          <div class="cast" id="introCast"></div>
+          <div class="byline" id="introBy"></div>
+          <div class="buttons">
+            <button class="btn primary focusable" id="btnPlay">▶ Play</button>
+            <button class="btn focusable" id="btnBack">Arcade</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PLAY -->
+    <section id="play" class="screen">
+      <canvas id="canvas" width="1280" height="720"></canvas>
+      <div class="toast" id="toast"></div>
+      <div class="pause-menu hidden" id="pauseMenu">
+        <h2>Paused</h2>
+        <button class="btn primary focusable" data-act="resume">Resume</button>
+        <button class="btn focusable" data-act="restart">Restart</button>
+        <button class="btn focusable" data-act="exit">Back to Arcade</button>
+        <p class="remix-hint">Want changes? On your phone, tap <b>Remix</b> and say <i>“make it faster”</i></p>
+      </div>
+    </section>
+
+    <!-- END -->
+    <section id="end" class="screen">
+      <div class="end-card">
+        <div class="end-emoji" id="endEmoji"></div>
+        <h2 id="endTitle">You win!</h2>
+        <p id="endLine"></p>
+        <div class="end-score" id="endScore"></div>
+        <div class="buttons">
+          <button class="btn primary focusable" id="btnAgain">Play again</button>
+          <button class="btn focusable" id="btnEndArcade">Arcade</button>
+        </div>
+        <p class="remix-hint">Remix it from your phone: <i>“add lava”</i>, <i>“make it night”</i>, <i>“give me a boss”</i></p>
+      </div>
+    </section>
+  </div>
+  <script type="module" src="tv.js"></script>
+</body>
+</html>

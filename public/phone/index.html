@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#12102b">
+  <title>Couch Game Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap">
+  <link rel="stylesheet" href="/phone/phone.css">
+</head>
+<body>
+  <header class="bar">
+    <div class="brand">🛋️🎮 <b>Couch Game Studio</b></div>
+    <div class="status" id="status"><span class="dot"></span><span id="statusText">Connecting…</span></div>
+  </header>
+
+  <!-- JOIN -->
+  <main id="join" class="view active">
+    <h1>Hi! What's your name?</h1>
+    <p class="muted">So the TV knows who made the game.</p>
+    <input id="nameInput" maxlength="16" placeholder="Maya" autocomplete="given-name" enterkeyhint="go">
+    <button class="big-btn primary" id="joinBtn">Let's play</button>
+    <p class="muted small">Room <b id="roomLabel"></b></p>
+  </main>
+
+  <!-- CREATE -->
+  <main id="create" class="view">
+    <nav class="tabs">
+      <button class="tab active" data-tab="make">✨ Make</button>
+      <button class="tab" data-tab="remix" id="remixTab" disabled>🔁 Remix</button>
+      <button class="tab" data-tab="pad" id="padTab">🎮 Play</button>
+    </nav>
+
+    <section class="panel active" id="panel-make">
+      <h2>Describe your game</h2>
+      <div class="mic-wrap">
+        <button class="mic" id="micBtn" aria-label="Talk"><span>🎤</span></button>
+        <div class="mic-label" id="micLabel">Tap and tell me your idea</div>
+      </div>
+      <textarea id="promptInput" rows="3" maxlength="400" placeholder="My dog Biscuit catches falling tacos but has to dodge broccoli"></textarea>
+      <div class="ideas" id="ideas"></div>
+
+      <div class="hero-pick">
+        <label class="photo-btn" for="photoInput">📸 Use my drawing or photo as the hero</label>
+        <input type="file" id="photoInput" accept="image/*" capture="environment" hidden>
+        <div class="photo-preview hidden" id="photoPreview">
+          <canvas id="photoCanvas" width="256" height="256"></canvas>
+          <div class="photo-tools">
+            <label><input type="checkbox" id="bgToggle" checked> Remove background</label>
+            <button class="link" id="photoClear">Remove</button>
+          </div>
+        </div>
+      </div>
+      <button class="big-btn primary" id="makeBtn">✨ Make my game!</button>
+    </section>
+
+    <section class="panel" id="panel-remix">
+      <h2>Remix <span id="remixTitle">this game</span></h2>
+      <p class="muted">Tell the TV what to change.</p>
+      <div class="mic-wrap">
+        <button class="mic" id="remixMicBtn" aria-label="Talk"><span>🎤</span></button>
+        <div class="mic-label" id="remixMicLabel">“make it faster”</div>
+      </div>
+      <textarea id="remixInput" rows="2" maxlength="300" placeholder="Add lava and make Biscuit giant"></textarea>
+      <div class="ideas" id="remixIdeas"></div>
+      <button class="big-btn primary" id="remixBtn">🔁 Remix it!</button>
+    </section>
+
+    <section class="panel" id="panel-pad">
+      <div class="pad-title" id="padTitle">Waiting for a game on the TV…</div>
+      <div class="pad" id="pad" data-genre="catcher">
+        <div class="pad-dpad">
+          <button class="pb up" data-a="up">▲</button>
+          <button class="pb left" data-a="left">◀</button>
+          <button class="pb right" data-a="right">▶</button>
+          <button class="pb down" data-a="down">▼</button>
+        </div>
+        <button class="pb action" data-a="action" id="actionBtn">JUMP</button>
+      </div>
+      <div class="pad-nav">
+        <button class="small-btn" data-nav="pause">⏸ Pause</button>
+        <button class="small-btn" data-nav="play">▶ Resume</button>
+        <button class="small-btn" data-nav="again">↻ Again</button>
+      </div>
+    </section>
+  </main>
+
+  <div class="overlay hidden" id="overlay">
+    <div class="overlay-card">
+      <div class="spinner"></div>
+      <div id="overlayText">Making your game…</div>
+      <div class="muted small">Look at the TV!</div>
+    </div>
+  </div>
+  <div class="phone-toast" id="toast"></div>
+  <script type="module" src="/phone/phone.js"></script>
+</body>
+</html>

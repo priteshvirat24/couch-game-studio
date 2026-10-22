@@ -1,0 +1,60 @@
+// A few games so the Family Arcade isn't empty on first launch.
+export const SEED_GAMES = [
+  {
+    id: 'seed-taco',
+    author: 'Maya, 7',
+    prompt: 'My dog Biscuit catches falling tacos but has to dodge broccoli',
+    spec: {
+      title: "Biscuit's Taco Rain", tagline: 'Tacos good. Broccoli BAD.', genre: 'catcher',
+      hero: { name: 'Biscuit', emoji: '🐶' },
+      goodies: [{ name: 'Taco', emoji: '🌮', points: 1 }, { name: 'Bone', emoji: '🦴', points: 3 }],
+      hazards: [{ name: 'Broccoli', emoji: '🥦' }],
+      theme: { skyTop: '#ffb703', skyBottom: '#ffe8b6', ground: '#e76f51', scenery: '🌵☀️🏜️' },
+      rules: { speed: 4, spawnRate: 5, lives: 3, goalScore: 20 }, modifiers: ['confetti'],
+      narration: { intro: 'Biscuit is HUNGRY. Catch those tacos!', win: 'Biscuit is stuffed! Best dog ever!', lose: 'Too much broccoli! Biscuit needs a nap.' },
+    },
+  },
+  {
+    id: 'seed-dino',
+    author: 'Arjun, 9',
+    prompt: 'A dinosaur running through a volcano jumping over lava rocks and collecting gems',
+    spec: {
+      title: 'Dino Lava Dash', tagline: 'Jump! Jump! JUMP!', genre: 'runner',
+      hero: { name: 'Rex', emoji: '🦖' },
+      goodies: [{ name: 'Gem', emoji: '💎', points: 2 }, { name: 'Egg', emoji: '🥚', points: 1 }],
+      hazards: [{ name: 'Lava rock', emoji: '🪨' }, { name: 'Fireball', emoji: '🔥' }],
+      theme: { skyTop: '#3d0c02', skyBottom: '#ff6b35', ground: '#6a040f', scenery: '🌋💨🌋' },
+      rules: { speed: 5, spawnRate: 5, lives: 3, goalScore: 25 }, modifiers: ['lava_floor'],
+      narration: { intro: 'The volcano is waking up. Run, Rex, run!', win: 'Rex escaped the volcano!', lose: 'Ouch, hot rocks! Try again!' },
+    },
+  },
+  {
+    id: 'seed-ghost',
+    author: 'Grandpa & Zoe',
+    prompt: 'A bunny in a spooky castle maze collecting carrots while ghosts float around',
+    spec: {
+      title: 'Spooky Carrot Castle', tagline: 'Boo! Carrots!', genre: 'maze',
+      hero: { name: 'Bun Bun', emoji: '🐰' },
+      goodies: [{ name: 'Carrot', emoji: '🥕', points: 1 }],
+      hazards: [{ name: 'Ghost', emoji: '👻' }],
+      goal: '🚪',
+      theme: { skyTop: '#240046', skyBottom: '#7b2cbf', ground: '#e0aaff', scenery: '🏰🌙🦇' },
+      rules: { speed: 4, spawnRate: 4, lives: 3, goalScore: 20 }, modifiers: ['night'],
+      narration: { intro: 'Grab every carrot, then find the door!', win: 'Bun Bun escaped with ALL the carrots!', lose: 'The ghosts got you! Boo!' },
+    },
+  },
+  {
+    id: 'seed-space',
+    author: 'Leo, 6',
+    prompt: 'A rocket shooting stars at aliens in space with a giant alien boss',
+    spec: {
+      title: 'Alien Pizza Party', tagline: 'Zap the aliens, save the pizza!', genre: 'shooter',
+      hero: { name: 'Rocket', emoji: '🚀' }, projectile: '⭐',
+      goodies: [{ name: 'Pizza', emoji: '🍕', points: 3 }],
+      hazards: [{ name: 'Alien', emoji: '👾' }, { name: 'UFO', emoji: '🛸' }],
+      theme: { skyTop: '#03045e', skyBottom: '#2a1b5c', ground: '#5c5c8a', scenery: '🪐🌙✨' },
+      rules: { speed: 4, spawnRate: 5, lives: 4, goalScore: 25 }, modifiers: ['boss'],
+      narration: { intro: 'Aliens want our pizza. Not today!', win: 'Pizza is safe! Party time!', lose: 'The aliens got the pizza...' },
+    },
+  },
+];
