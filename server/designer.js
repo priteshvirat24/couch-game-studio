@@ -33,7 +33,7 @@ export async function designGame(prompt, { heroImage = null, playtestEnabled = t
   const safe = checkText(prompt);
   if (!safe.ok) throw new UnsafeRequestError(safe.reason);
   const difficulty = difficultyFrom(safe.text);
-  const { spec, provider, ms } = await createSpec(safe.text, { heroImage });
+  const { spec, provider, ms } = await createSpec(safe.text, { heroImage, difficulty });
   const tested = playtest(spec, difficulty, playtestEnabled);
   return { prompt: safe.text, spec: tested.spec, playtest: tested.report, provider, ms };
 }
@@ -42,7 +42,7 @@ export async function remixGame(base, instruction, { playtestEnabled = true } = 
   const safe = checkText(instruction, { max: 300 });
   if (!safe.ok) throw new UnsafeRequestError(safe.reason);
   const difficulty = difficultyFrom(safe.text, base.playtest?.difficulty || 'normal');
-  const { spec, provider, ms } = await remixSpec(base.spec, safe.text);
+  const { spec, provider, ms } = await remixSpec(base.spec, safe.text, { difficulty });
   const tested = playtest(spec, difficulty, playtestEnabled);
   return { instruction: safe.text, spec: tested.spec, playtest: tested.report, provider, ms };
 }

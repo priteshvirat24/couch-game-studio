@@ -1,25 +1,32 @@
 {
   "name": "couch-game-studio",
-  "version": "0.1.0",
-  "description": "Describe or draw a game on your phone, play it on Fire TV in seconds.",
+  "version": "1.0.0",
+  "description": "Imagine a game, say or draw it on your phone, and play it on Fire TV seconds later. Every game is robot-playtested to be fair.",
   "type": "module",
   "license": "Apache-2.0",
   "scripts": {
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
-    "test": "node --test server/*.test.js"
+    "test": "node --test server/*.test.js",
+    "docker:build": "docker build -t couch-game-studio .",
+    "docker:run": "docker run -p 8787:8787 -v couch-data:/data couch-game-studio"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^1.1.0",
     "@aws-sdk/client-bedrock-runtime": "^3.1156.0",
+    "@strands-agents/sdk": "^1.22.0",
     "compression": "^1.8.2",
     "couch-engine": "github:priteshvirat24/couch-engine#v1.1.0",
     "emojilib": "^4.0.3",
-    "express": "^4.22.3",
+    "express": "^5.3.0",
     "qrcode": "^1.5.4",
-    "ws": "^8.22.0"
+    "ws": "^8.22.0",
+    "zod": "^4.6.7"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/priteshvirat24/couch-game-studio.git"
   }
 }
