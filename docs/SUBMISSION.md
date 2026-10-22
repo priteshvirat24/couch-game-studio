@@ -16,12 +16,12 @@
 **What we built.** Couch Game Studio turns Fire TV into a family game studio.
 1. A kid scans the QR code on the TV with any phone (no install) and *says* their game: "My dog Biscuit catches falling tacos but has to dodge broccoli."
 2. Optionally, they snap a photo of a crayon drawing or the real dog. It's cut out on the phone and becomes the hero.
-3. While the TV shows the kid's own words "being imagined", Claude on Amazon Bedrock designs the game.
+3. While the TV shows the kid's own words "being imagined", generative AI on Amazon Bedrock designs the game.
 4. Seconds later it's playable on the TV with the Fire TV remote. Siblings and parents join as players 2–4 from their phones; the controller layout changes per genre.
 5. Anyone can remix by voice: "make it night", "add lava", "give me a boss". Every version is saved in the **Family Arcade** on the TV.
 
 **How it works.**
-- **The AI never writes code.** Claude fills in a strict, validated *GameSpec*: genre (catch, run & jump, maze, zap), hero, goodies, hazards, world colors, difficulty and up to four of 12 modifiers (night lighting, lava floor, giant hero, boss fights, wind, reverse controls…).
+- **The AI never writes code.** The model fills in a strict, validated *GameSpec*: genre (catch, run & jump, maze, zap), hero, goodies, hazards, world colors, difficulty and up to four of 12 modifiers (night lighting, lava floor, giant hero, boss fights, wind, reverse controls…).
 - One hand-built canvas engine can run any spec. That makes generation fast, kid-safe and impossible to crash, and every game is fun, because the game feel is engineered rather than generated.
 - **The Fire TV app is built for the 10-foot UI.** It is a React Native for Vega app (official `vegaWebview` template) hosting the TV experience, with spatial D-pad navigation, big focus states, Back and Play/Pause handling, a 3-2-1-GO countdown, and gold-glow/red-glow visual language that tells little kids "grab this, avoid that" from across the room.
 - **Never a dead end.** If no model is reachable, an offline designer reads the sentence (verbs → genre, nouns → sprites via the open emojilib dictionary), so a kid always gets a game.

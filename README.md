@@ -7,7 +7,7 @@
 **Kids invent video games out loud, and Fire TV builds them in seconds.**
 
 ![Fire TV](https://img.shields.io/badge/Fire%20TV-Vega%20OS-ff9900?style=for-the-badge&logo=amazon&logoColor=white)
-![Amazon Bedrock](https://img.shields.io/badge/Amazon%20Bedrock-Claude-232f3e?style=for-the-badge&logo=amazonaws&logoColor=white)
+![Amazon Bedrock](https://img.shields.io/badge/Amazon%20Bedrock-Generative%20AI-232f3e?style=for-the-badge&logo=amazonaws&logoColor=white)
 ![React Native for Vega](https://img.shields.io/badge/React%20Native-for%20Vega-61dafb?style=for-the-badge&logo=react&logoColor=black)
 ![License](https://img.shields.io/badge/license-Apache--2.0-06d6a0?style=for-the-badge)
 
@@ -51,7 +51,7 @@ The TV is the biggest screen in the house, and it's the one kids only ever *watc
 |---|---|
 | 🎤 **Describe** | Say or type the game on any phone. No app install: scan the QR code on the TV. |
 | 📸 **Draw** | Snap a drawing or a photo of the family dog. The background is removed on the phone and it becomes the hero sprite. |
-| ✨ **Generate** | Claude (on **Amazon Bedrock**) designs the game as a validated *GameSpec*: genre, hero, goodies, hazards, world colors, difficulty and modifiers. |
+| ✨ **Generate** | Generative AI on **Amazon Bedrock** designs the game as a validated *GameSpec*: genre, hero, goodies, hazards, world colors, difficulty and modifiers. |
 | 📺 **Play** | One engine runs every spec: **Catch**, **Run & Jump**, **Maze** and **Zap**, with modifiers like night mode, lava floor, giant hero, boss fights, wind, rainbow trail and reverse controls. It's fully playable with the Fire TV D-pad. |
 | 👨‍👩‍👧 **Co-op** | Up to 4 players. The TV remote is player 1, and phones become controllers whose layout changes with each genre. |
 | 🔁 **Remix** | *"Make it faster and put it at night."* Every remix is saved as a new version in the **Family Arcade**. |

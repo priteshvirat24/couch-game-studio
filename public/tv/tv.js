@@ -232,8 +232,7 @@ async function openIntro(gameOrId) {
   const hazards = s.hazards.map((h) => `<img src="${emojiSrc(h.emoji)}" alt="${esc(h.name)}">`).join('');
   const mods = (s.modifiers || []).map((m) => m.replace('_', ' ')).join(' · ');
   $('introCast').innerHTML = `<span class="grp">Get ${goodies}</span><span class="grp">Avoid ${hazards}</span>${mods ? `<span class="grp">✨ ${esc(mods)}</span>` : ''}`;
-  const by = game.provider?.startsWith('bedrock') ? 'Claude on Amazon Bedrock' : game.provider?.startsWith('claude') ? 'Claude' : game.provider === 'seed' ? null : 'the offline designer';
-  $('introBy').textContent = `Made by ${game.author} · “${game.prompt}”${by ? ` · designed by ${by}` : ''}`;
+  $('introBy').textContent = `Made by ${game.author} · “${game.prompt}”`;
   show('intro');
 }
 

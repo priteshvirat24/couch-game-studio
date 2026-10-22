@@ -11,7 +11,7 @@
 1. `npm start`, then `cloudflared tunnel --url http://localhost:8787`. Put the tunnel URL in `vega/src/config.ts`, then `vega build` and `vega run-app`.
 2. Pre-create 1–2 games so the Family Arcade looks lived-in (the seeds are already there).
 3. Have a crayon drawing ready (a simple monster or a pet works best on white paper).
-4. Make sure Bedrock or the Claude API is configured, so the intro card says *"designed by Claude on Amazon Bedrock"*.
+4. Make sure Amazon Bedrock is configured, so games are designed live by the AI (the offline designer is the fallback).
 
 ---
 
@@ -20,11 +20,11 @@
 | **0:00–0:12** | Black screen with text: *"Parents keep asking: how do I help my kid make a video game?"* Then quick cuts of the r/learnprogramming thread (361 upvotes) and the r/Parenting screen-time threads. | "Kids don't just want to play games. They want to make them. But every tool needs reading, typing and a laptop." |
 | **0:12–0:22** | The living-room TV showing the Couch Game Studio Family Arcade (VVD). D-pad focus moves across the cards. | "So we turned the biggest screen in the house into a game studio. Meet Couch Game Studio, on Fire TV." |
 | **0:22–0:45** | Phone scans the QR code, then the kid types their name. The kid taps the mic and says: *"My monster Blobby catches donuts and has to dodge spiders!"* Snap the crayon drawing; the background disappears. Tap **Make my game!** | "No app to install. Scan, say your idea, and if you like, snap a drawing." |
-| **0:45–1:00** | The TV switches to the "imagining…" screen with the kid's quote and the steps ticking. Cut to the intro card: **the drawing is the hero**, with donuts to get and spiders to avoid. | "Claude on Amazon Bedrock designs the game while the TV shows your idea coming to life. And that's YOUR drawing as the hero." |
+| **0:45–1:00** | The TV switches to the "imagining…" screen with the kid's quote and the steps ticking. Cut to the intro card: **the drawing is the hero**, with donuts to get and spiders to avoid. | "Amazon Bedrock designs the game while the TV shows your idea coming to life. And that's YOUR drawing as the hero." |
 | **1:00–1:25** | Press OK, then 3-2-1-GO. Play with the Fire TV remote: catching donuts gives +1 confetti, a spider hit shakes the screen. A second phone joins and "Dad joined the game!" appears, with two heroes on screen. | "It's a real game: remote in hand, gold means grab it, red means dodge it. Everyone on the couch can join from their phone, up to four players." |
 | **1:25–1:50** | Pause, then from the phone open **Remix** and say *"make it night and give me a boss!"* The TV shows the remix magic, then night-mode spotlight lighting and a BOSS! banner. | "Then the best part: remix it out loud. Night mode. A boss fight. Every version is saved in the Family Arcade." |
 | **1:50–2:10** | Montage of the four genres: the Dino Lava Dash runner, the Spooky Carrot Castle maze in night mode, the Alien Pizza Party shooter with a boss health bar, and Biscuit's catcher. | "Four game types and twelve modifiers, all from a sentence." |
-| **2:10–2:35** | Architecture slide: phone → studio server → Bedrock (Claude, tool use) → GameSpec → Vega WebView → engine. Highlight *"The AI never writes code."* | "Under the hood, Claude doesn't write code. It fills in a strict game spec that our engine already knows how to run. That makes it fast, safe for kids, and it never crashes. It's a React Native for Vega app, D-pad first, built for the 10-foot screen." |
+| **2:10–2:35** | Architecture slide: phone → studio server → Amazon Bedrock (tool use) → GameSpec → Vega WebView → engine. Highlight *"The AI never writes code."* | "Under the hood, the AI doesn't write code. It fills in a strict game spec that our engine already knows how to run. That makes it fast, safe for kids, and it never crashes. It's a React Native for Vega app, D-pad first, built for the 10-foot screen." |
 | **2:35–2:45** | Back on the TV: the arcade with the kid's game card labelled NEW. End card with the logo: *Couch Game Studio. Say it. Draw it. Play it.* | "Screen time, turned into creation time." |
 
 **Editing tips**
