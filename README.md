@@ -169,6 +169,8 @@ Phone links follow whatever address the TV used. Set `PUBLIC_URL` to pin one.
 
 ### On Fire TV (Vega OS)
 
+Step-by-step guide with a test checklist: [docs/FIRE_TV_HANDOFF.md](docs/FIRE_TV_HANDOFF.md).
+
 The Vega WebView runs on the Vega Virtual Device only on Apple-silicon Macs (per Amazon's docs).
 
 ```bash
@@ -179,7 +181,7 @@ cd vega
 npm install
 npm run build                   # armv7, aarch64 and x86_64 .vpkg files in build/
 vega virtual-device start
-vega run-app build/aarch64-release/couchgamestudio_aarch64.vpkg
+vega run-app build/aarch64-release/couchgamestudio_aarch64.vpkg com.couchgamestudio.tv.main
 # A Fire TV Stick in developer mode uses build/armv7-release/couchgamestudio_armv7.vpkg
 ```
 
