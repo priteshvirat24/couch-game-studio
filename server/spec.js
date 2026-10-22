@@ -211,7 +211,9 @@ export function offlineSpec(prompt = '', extras = {}) {
     hazards,
     projectile: '✨',
     goal: '🏆',
-    theme: place?.val || { skyTop: '#5ec8ff', skyBottom: '#d6f3ff', ground: '#4caf50', scenery: '☁️🌳🌼' },
+    theme: place?.val || (modifiers.includes('night')
+      ? { skyTop: '#070720', skyBottom: '#2f2366', ground: '#26304f', scenery: '🌙✨⭐' }
+      : { skyTop: '#5ec8ff', skyBottom: '#d6f3ff', ground: '#4caf50', scenery: '☁️🌳🌼' }),
     rules: { speed: fast ? 7 : easy ? 2 : 4, spawnRate: fast ? 7 : easy ? 3 : 5, lives: easy ? 5 : 3, goalScore: easy ? 10 : 20 },
     modifiers,
     narration: {

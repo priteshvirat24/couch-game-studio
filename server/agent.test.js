@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { GameSpecSchema, playtestTool } from './agent.js';
+import { GameSpecSchema, playtestTool, directorModel } from './agent.js';
 import { SEED_GAMES } from './seeds.js';
 
 test('every starter game satisfies the agent\'s structured-output schema', () => {
@@ -23,4 +23,9 @@ test('the playtest_game tool lets the agent see how robots fared', async () => {
   assert.ok(['fair', 'tricky', 'tough'].includes(out.verdict));
   assert.ok(out.tunedRules.speed < 10, 'robots eased the impossible rules');
   assert.ok(typeof out.advice === 'string');
+});
+
+test('the Game Director can run on either Bedrock API', () => {
+  assert.equal(directorModel({ api: 'mantle', region: 'eu-north-1', modelId: 'moonshotai.kimi-k2.5' }).constructor.name, 'OpenAIModel');
+  assert.equal(directorModel({ api: 'runtime', region: 'eu-north-1', modelId: 'eu.amazon.nova-lite-v1:0' }).constructor.name, 'BedrockModel');
 });

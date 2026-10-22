@@ -3,78 +3,94 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=1920, initial-scale=1">
+  <meta name="color-scheme" content="dark">
   <title>Couch Game Studio</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap">
+  <link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
+  <link rel="preload" href="/assets/fonts/fredoka-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/assets/fonts/fredoka.css">
   <link rel="stylesheet" href="tv.css">
 </head>
 <body>
   <div id="stage">
-    <!-- ARCADE / HOME -->
+    <!-- ARCADE / HOME -------------------------------------------------------->
     <section id="arcade" class="screen active" aria-label="Family Arcade">
       <header class="top">
         <div class="brand">
-          <div class="logo">🛋️🎮</div>
-          <div>
+          <img class="logo" src="/assets/icon.svg" alt="" width="112" height="112">
+          <div class="brand-text">
             <h1>Couch Game Studio</h1>
             <p class="sub">Imagine a game. Say it. Play it on the big screen.</p>
-            <button class="pill-btn focusable" id="btnTts" aria-pressed="true">🔊 Read aloud: on</button>
           </div>
         </div>
         <div class="join-card" id="joinCard">
-          <img id="qr" alt="Scan to join" width="150" height="150">
+          <div class="qr" id="qr" role="img" aria-label="QR code to join from a phone"></div>
           <div class="join-text">
-            <div class="join-title">Imagine a game? Make it with your phone</div>
-            <div class="join-url">Scan, or open <b id="joinUrl">…</b></div>
+            <div class="join-title"><span data-icon="phone" data-size="34"></span>Got a game in your head?</div>
+            <div class="join-how">Scan with any phone, or open <b id="joinUrl">…</b></div>
             <div class="join-code">Room <span id="roomCode">····</span></div>
             <div class="players" id="playerChips"></div>
           </div>
         </div>
       </header>
-      <h2 class="shelf-title">Family Arcade</h2>
+
+      <div class="shelf-head">
+        <h2 class="shelf-title">Family Arcade</h2>
+        <button class="pill-btn focusable" id="btnTts" aria-pressed="true">Read aloud</button>
+      </div>
       <div class="shelf" id="shelf"></div>
-      <footer class="hint"><span class="key">◀ ▶</span> browse <span class="key">OK</span> play <span class="dot">•</span> Phones join as extra players</footer>
+
+      <footer class="hint">
+        <span class="key"><span data-icon="left" data-size="26"></span><span data-icon="right" data-size="26"></span></span> browse
+        <span class="key"><span data-icon="ok" data-size="26"></span></span> play
+        <span class="sep" aria-hidden="true"></span>
+        <span data-icon="phone" data-size="26"></span> phones join as extra players
+      </footer>
     </section>
 
-    <!-- CREATING -->
+    <!-- IMAGINING ------------------------------------------------------------>
     <section id="creating" class="screen" aria-live="polite">
       <div class="creating-inner">
-        <div class="quote-by" id="createBy">Maya says</div>
-        <blockquote id="createQuote">“…”</blockquote>
-        <div class="magic">
-          <div class="orb"></div><div class="orb o2"></div><div class="orb o3"></div>
-        </div>
+        <div class="quote-by" id="createBy">Maya imagined</div>
+        <blockquote id="createQuote" class="quote"></blockquote>
         <div class="steps" id="createSteps"></div>
-        <div class="create-error hidden" id="createError"></div>
+        <div class="create-error hidden" id="createError" role="alert"></div>
       </div>
     </section>
 
-    <!-- INTRO -->
+    <!-- INTRO ---------------------------------------------------------------->
     <section id="intro" class="screen">
       <div class="intro-card" id="introCard">
         <div class="intro-art" id="introArt"></div>
         <div class="intro-body">
-          <div class="pill" id="introGenre">catcher</div>
+          <div class="pill" id="introGenre">Catch</div>
           <h2 id="introTitle">Title</h2>
           <p class="tagline" id="introTagline"></p>
           <p class="narration" id="introNarration"></p>
-          <div class="how" id="introHow"></div>
-          <div class="cast" id="introCast"></div>
-          <div class="tested" id="introTested"></div>
-          <div class="board" id="introBoard"></div>
-          <div class="byline" id="introBy"></div>
+
+          <div class="intro-info">
+            <div class="how" id="introHow"></div>
+            <div class="cast" id="introCast"></div>
+
+            <div class="meta-row">
+              <div class="tested" id="introTested"></div>
+              <div class="board" id="introBoard"></div>
+            </div>
+            <div class="byline" id="introBy"></div>
+          </div>
+
           <div class="buttons">
-            <button class="btn primary focusable" id="btnPlay">▶ Play</button>
-            <button class="btn focusable" id="btnBack">Arcade</button>
-            <button class="btn subtle focusable" id="btnHide" title="Grown-ups: remove from the arcade">🗑</button>
+            <button class="btn primary focusable" id="btnPlay"><span data-icon="play" data-size="36"></span>Play</button>
+            <button class="btn focusable" id="btnBack"><span data-icon="home" data-size="34"></span>Arcade</button>
+            <button class="btn icon-only focusable" id="btnHide" aria-label="Remove from the arcade (grown-ups)"><span data-icon="trash" data-size="34"></span></button>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- CONFIRM (grown-ups) -->
-    <div class="modal hidden" id="confirm" role="dialog" aria-modal="true">
+    <!-- GROWN-UP CONFIRM ----------------------------------------------------->
+    <div class="modal hidden" id="confirm" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
       <div class="modal-card">
+        <span class="modal-icon" data-icon="trash" data-size="56"></span>
         <h2 id="confirmTitle">Remove this game?</h2>
         <p id="confirmText">It disappears from the Family Arcade. Grown-ups can bring it back later.</p>
         <div class="buttons">
@@ -84,35 +100,53 @@
       </div>
     </div>
 
-    <!-- PLAY -->
+    <!-- PLAY ----------------------------------------------------------------->
     <section id="play" class="screen">
       <canvas id="canvas" width="1280" height="720"></canvas>
-      <div class="toast" id="toast"></div>
       <div class="reactions" id="reactions" aria-hidden="true"></div>
       <div class="pause-menu hidden" id="pauseMenu">
-        <h2>Paused</h2>
-        <button class="btn primary focusable" data-act="resume">Resume</button>
-        <button class="btn focusable" data-act="restart">Restart</button>
-        <button class="btn focusable" data-act="exit">Back to Arcade</button>
-        <p class="remix-hint">Want changes? On your phone, tap <b>Remix</b> and say <i>“make it faster”</i></p>
+        <div class="pause-card">
+          <h2>Paused</h2>
+          <button class="btn primary focusable" data-act="resume"><span data-icon="play" data-size="34"></span>Keep playing</button>
+          <button class="btn focusable" data-act="restart"><span data-icon="replay" data-size="34"></span>Start over</button>
+          <button class="btn focusable" data-act="exit"><span data-icon="home" data-size="34"></span>Back to the arcade</button>
+          <p class="remix-hint"><span data-icon="remix" data-size="28"></span><span>Want it different? Tap <b>Remix</b> on your phone and say <i>“make it faster”</i></span></p>
+        </div>
       </div>
     </section>
 
-    <!-- END -->
-    <section id="end" class="screen">
-      <div class="end-card">
-        <div class="end-emoji" id="endEmoji"></div>
-        <h2 id="endTitle">You win!</h2>
-        <p id="endLine"></p>
-        <div class="end-score" id="endScore"></div>
-        <div class="board end-board" id="endBoard"></div>
+    <!-- OFFLINE (server unreachable on boot) ------------------------------------>
+    <section id="offline" class="screen" aria-labelledby="offlineTitle">
+      <div class="offline-card">
+        <span class="modal-icon" data-icon="robot" data-size="56"></span>
+        <h2 id="offlineTitle">The game studio is napping</h2>
+        <p>We can’t reach it right now. Check that the studio server is running and on the same Wi-Fi.</p>
+        <p class="offline-status" id="offlineText" role="status" aria-live="polite">We’ll keep trying.</p>
         <div class="buttons">
-          <button class="btn primary focusable" id="btnAgain">Play again</button>
-          <button class="btn focusable" id="btnEndArcade">Arcade</button>
+          <button class="btn primary focusable" id="btnRetry"><span data-icon="replay" data-size="34"></span>Try again</button>
         </div>
-        <p class="remix-hint">Remix it from your phone: <i>“add lava”</i>, <i>“make it night”</i>, <i>“give me a boss”</i></p>
       </div>
     </section>
+
+    <!-- END ------------------------------------------------------------------>
+    <section id="end" class="screen">
+      <div class="confetti" id="confetti" aria-hidden="true"></div>
+      <div class="end-card">
+        <div class="end-hero" id="endEmoji"></div>
+        <h2 id="endTitle">You did it!</h2>
+        <p class="end-line" id="endLine"></p>
+        <div class="end-score" id="endScore"></div>
+        <ol class="podium" id="endBoard"></ol>
+        <div class="buttons">
+          <button class="btn primary focusable" id="btnAgain"><span data-icon="replay" data-size="34"></span>Play again</button>
+          <button class="btn focusable" id="btnEndArcade"><span data-icon="home" data-size="34"></span>Arcade</button>
+        </div>
+        <p class="remix-hint"><span data-icon="remix" data-size="28"></span><span>Remix it from your phone: <i>“add lava”</i>, <i>“make it night”</i>, <i>“give me a boss”</i></span></p>
+      </div>
+    </section>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <div class="net-status hidden" id="netStatus" role="status" aria-live="polite"></div>
   </div>
   <script type="module" src="tv.js"></script>
 </body>

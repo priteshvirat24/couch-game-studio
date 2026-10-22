@@ -1,23 +1,41 @@
 // Turns someone's imagination (a sentence, or a remix request) into a GameSpec.
 //
 // Designer chain, first one that works wins:
-//   1. Game Director: a Strands agent on Amazon Bedrock that designs, robot-playtests
-//      and revises the game (server/agent.js).
-//   2. Bedrock Converse: one call with a make_game tool (faster, no playtest loop).
-//   3. Offline designer: keyword-based, instant, never fails (server/spec.js).
+//   1. Game Director on Bedrock Mantle: a Strands agent that designs, robot-playtests and
+//      revises the game, running an open-weight model through Bedrock's OpenAI-compatible
+//      endpoint (server/agent.js). A second Mantle model steps in if the first one fails.
+//   2. Game Director on the Bedrock Converse API (Nova, or partner models where enabled).
+//   3. Bedrock Converse: one call with a make_game tool (faster, no playtest loop).
+//   4. Offline designer: keyword-based, instant, never fails (server/spec.js).
 // Every path ends in normalizeSpec(), and designer.js balances the result again.
 
 import { BedrockRuntimeClient, ConverseCommand } from '@aws-sdk/client-bedrock-runtime';
 import { SPEC_JSON_SCHEMA, GENRE_HELP, MODIFIERS, normalizeSpec, offlineSpec, offlineRemix } from './spec.js';
 import { directGame } from './agent.js';
 
-const REGION = process.env.BEDROCK_REGION || process.env.AWS_REGION || 'us-east-1';
-const MODEL_ID = process.env.BEDROCK_MODEL_ID || 'us.anthropic.claude-opus-5-5';
 const TIMEOUT_MS = Number(process.env.LLM_TIMEOUT_MS || 60000);
-// auto | agent | converse | offline
+// auto | mantle | agent | converse | offline
 const MODE = process.env.LLM_PROVIDER || 'auto';
+// Spending guard: at most this many Bedrock designs per day, then the offline designer
+// takes over until midnight (UTC). Keeps a demo from quietly burning through credit.
+const DAILY_LIMIT = Number(process.env.BEDROCK_DAILY_LIMIT || 150);
+const usage = { day: '', count: 0 };
+const today = () => new Date().toISOString().slice(0, 10);
+function underBudget() {
+  if (usage.day !== today()) Object.assign(usage, { day: today(), count: 0 });
+  return usage.count < DAILY_LIMIT;
+}
+const MANTLE_MODELS = (process.env.BEDROCK_MANTLE_MODELS || 'qwen.qwen3-235b-a22b-2507,moonshotai.kimi-k2.5')
+  .split(',').map((m) => m.trim()).filter(Boolean);
 
-const bedrock = new BedrockRuntimeClient({ region: REGION });
+// The Region comes from BEDROCK_REGION, else the usual AWS env vars / profile config.
+const bedrock = new BedrockRuntimeClient(process.env.BEDROCK_REGION ? { region: process.env.BEDROCK_REGION } : {});
+let REGION = process.env.BEDROCK_REGION || process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || null;
+const region = async () => (REGION ||= await bedrock.config.region().catch(() => 'us-east-1'));
+region();
+// Cross-Region inference profiles are named after the geography (us., eu., apac.).
+const geo = (r) => (r.startsWith('eu-') ? 'eu' : r.startsWith('ap-') ? 'apac' : 'us');
+const runtimeModel = (r) => process.env.BEDROCK_MODEL_ID || `${geo(r)}.anthropic.claude-opus-5-5`;
 
 const SYSTEM = `You are the game designer inside "Couch Game Studio", a Fire TV app where anyone imagines a
 game out loud and plays it on the TV seconds later. You never write code: you fill in a GameSpec by
@@ -36,7 +54,7 @@ const TOOL = { toolSpec: { name: 'make_game', description: 'Create or update the
 
 async function converseSpec(userText) {
   const res = await bedrock.send(new ConverseCommand({
-    modelId: MODEL_ID,
+    modelId: runtimeModel(await region()),
     system: [{ text: SYSTEM }],
     messages: [{ role: 'user', content: [{ text: userText }] }],
     // Current models reject forced tool choice; "auto" plus the instruction works.
@@ -55,18 +73,33 @@ const status = { last: null, lastError: null };
 const backoff = new Map();
 
 const PROVIDERS = [
-  { name: 'agent', label: `Game Director agent (Strands on Bedrock, ${MODEL_ID})`, enabled: () => ['auto', 'agent'].includes(MODE), run: (text, opts) => directGame(text, { region: REGION, modelId: MODEL_ID, difficulty: opts.difficulty, timeoutMs: TIMEOUT_MS }) },
-  { name: 'converse', label: `Bedrock Converse (${MODEL_ID})`, enabled: () => ['auto', 'converse'].includes(MODE), run: (text) => converseSpec(text) },
+  ...MANTLE_MODELS.map((modelId) => ({
+    name: `mantle:${modelId}`, kind: 'mantle', enabled: () => ['auto', 'mantle'].includes(MODE),
+    label: () => `Game Director agent (Strands on Bedrock Mantle, ${modelId})`,
+    run: async (text, opts) => directGame(text, { api: 'mantle', region: await region(), modelId, difficulty: opts.difficulty, timeoutMs: TIMEOUT_MS }),
+  })),
+  {
+    name: 'agent', kind: 'agent', enabled: () => ['auto', 'agent'].includes(MODE),
+    label: () => `Game Director agent (Strands on Bedrock Converse, ${runtimeModel(REGION || '')})`,
+    run: async (text, opts) => { const r = await region(); return directGame(text, { api: 'runtime', region: r, modelId: runtimeModel(r), difficulty: opts.difficulty, timeoutMs: TIMEOUT_MS }); },
+  },
+  {
+    name: 'converse', kind: 'converse', enabled: () => ['auto', 'converse'].includes(MODE),
+    label: () => `Bedrock Converse (${runtimeModel(REGION || '')})`,
+    run: (text) => converseSpec(text),
+  },
 ];
 
 async function design(userText, opts = {}) {
+  if (MODE === 'offline' || !underBudget()) return null;
+  usage.count++;
   for (const p of PROVIDERS) {
     if (!p.enabled() || Date.now() < (backoff.get(p.name) || 0)) continue;
     try {
       const raw = await p.run(userText, opts);
-      status.last = p.label;
+      status.last = p.label();
       status.lastError = null;
-      return { raw, provider: p.name };
+      return { raw, provider: p.kind };
     } catch (err) {
       status.lastError = `${p.name}: ${err.name || 'Error'}: ${err.message}`;
       // Account/permission problems don't fix themselves in seconds: skip this provider for a minute.
@@ -98,5 +131,13 @@ export async function remixSpec(spec, instruction, { difficulty = 'normal' } = {
 }
 
 export function llmStatus() {
-  return { mode: MODE, region: REGION, model: MODEL_ID, chain: PROVIDERS.filter((p) => p.enabled()).map((p) => p.name).concat('offline'), last: status.last, lastError: status.lastError };
+  return {
+    mode: MODE,
+    region: REGION,
+    models: { mantle: MANTLE_MODELS, runtime: REGION ? runtimeModel(REGION) : null },
+    today: { designs: usage.day === today() ? usage.count : 0, limit: DAILY_LIMIT },
+    chain: PROVIDERS.filter((p) => p.enabled()).map((p) => p.name).concat('offline'),
+    last: status.last,
+    lastError: status.lastError,
+  };
 }

@@ -16,11 +16,13 @@
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-runtime": "^3.1156.0",
+    "@aws/bedrock-token-generator": "^1.1.0",
     "@strands-agents/sdk": "^1.22.0",
     "compression": "^1.8.2",
-    "couch-engine": "github:priteshvirat24/couch-engine#v1.1.0",
+    "couch-engine": "github:priteshvirat24/couch-engine#v1.2.0",
     "emojilib": "^4.0.3",
     "express": "^5.3.0",
+    "openai": "^6.49.0",
     "qrcode": "^1.5.4",
     "ws": "^8.22.0",
     "zod": "^4.6.7"

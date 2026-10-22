@@ -3,6 +3,8 @@
 
 import { Game, emojiCode, sfx, config as engineConfig } from '/engine/engine.js';
 
+import { icon, hydrateIcons } from '/assets/icons.js';
+
 engineConfig.emojiBase = '/emoji'; // served (and cached) by the studio server
 
 const $ = (id) => document.getElementById(id);
@@ -44,10 +46,11 @@ const store = {
 // ------------------------------------------------------------ read-aloud
 // Many of our players can't read yet, so the TV reads titles and results out loud.
 const speech = { on: store.get('cgs-tts') !== 'off' };
-function say(text) {
+// New lines interrupt the old one; `queue` lets a follow-up (e.g. "New record!") wait its turn.
+function say(text, { queue = false } = {}) {
   if (!speech.on || !text || !('speechSynthesis' in window)) return;
   try {
-    speechSynthesis.cancel();
+    if (!queue) speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
     u.rate = 0.95; u.pitch = 1.1;
     speechSynthesis.speak(u);
@@ -56,7 +59,7 @@ function say(text) {
 function hush() { try { window.speechSynthesis?.cancel(); } catch {} }
 function renderTts() {
   const b = $('btnTts');
-  b.textContent = speech.on ? '🔊 Read aloud: on' : '🔈 Read aloud: off';
+  b.innerHTML = `${icon(speech.on ? 'volume' : 'volumeOff', { size: 30 })}Read aloud ${speech.on ? 'on' : 'off'}`;
   b.setAttribute('aria-pressed', String(speech.on));
 }
 
@@ -67,6 +70,8 @@ async function api(path, opts = {}) {
   if (!res.ok) throw Object.assign(new Error(data.error || res.statusText), { status: res.status });
   return data;
 }
+// Server errors are already kid-friendly sentences; network failures are not.
+const friendly = (e, fallback = 'Hmm, that one fizzled. Try again!') => (e?.status && e.status < 500 && e.message ? e.message : fallback);
 
 // --------------------------------------------------------------- screens
 function show(name) {
@@ -90,15 +95,22 @@ function setFocus(el) {
   if (!el) return;
   el.classList.add('focused');
   if (state.screen === 'arcade') {
-    const i = [...$('shelf').children].indexOf(el);
-    if (i >= 0) { state.focus.arcade = i; scrollShelf(i); }
+    const i = [...$('shelf').querySelectorAll('.focusable')].indexOf(el);
+    if (i >= 0) { state.focus.arcade = i; scrollShelf(el); }
   }
 }
 function current() { return document.querySelector('.focused'); }
 function refocus() {
   const list = focusables();
   if (!list.length) return setFocus(null);
-  if (state.screen === 'arcade') return setFocus(list[Math.min(state.focus.arcade, list.length - 1)]);
+  if (state.screen === 'arcade') {
+    // Land on the game shelf (not the settings pill) so OK immediately plays or makes a game.
+    // Prefer the game we just came back from: new games can shift the shelf under the old index.
+    const cards = [...$('shelf').querySelectorAll('.focusable')];
+    const id = state.current?.id;
+    const back = id && cards.find((c) => c.dataset.id === id);
+    return setFocus(back || cards[Math.min(state.focus.arcade, cards.length - 1)] || list[0]);
+  }
   setFocus(list[0]);
 }
 function move(dir) {
@@ -113,7 +125,9 @@ function move(dir) {
     const b = el.getBoundingClientRect();
     const bx = b.left + b.width / 2, by = b.top + b.height / 2;
     const dx = bx - ax, dy = by - ay;
-    const ok = (dir === 'left' && dx < -5) || (dir === 'right' && dx > 5) || (dir === 'up' && dy < -5) || (dir === 'down' && dy > 5);
+    // Left/right stay on the same row: past the last card nothing happens (no jump to the pill).
+    if ((dir === 'left' || dir === 'right') && (b.bottom < a.top || b.top > a.bottom)) continue;
+    const ok =(dir === 'left' && dx < -5) || (dir === 'right' && dx > 5) || (dir === 'up' && dy < -5) || (dir === 'down' && dy > 5);
     if (!ok) continue;
     const main = dir === 'left' || dir === 'right' ? Math.abs(dx) : Math.abs(dy);
     const cross = dir === 'left' || dir === 'right' ? Math.abs(dy) : Math.abs(dx);
@@ -122,13 +136,13 @@ function move(dir) {
   }
   if (best) { setFocus(best); sfx.unlock(); sfx.tone(520, 0.05, { type: 'triangle', vol: 0.05 }); }
 }
-function scrollShelf(i) {
+// Keep the focused card roughly centred, measured from the real layout (stage px, unscaled),
+// and clamped so the first and last cards sit fully inside the shelf padding.
+function scrollShelf(card) {
   const shelf = $('shelf');
-  const cardW = 400; // card + gap
-  const visible = Math.floor((1920 - 192) / cardW);
-  const first = Math.max(0, Math.min(i - Math.floor(visible / 2), shelf.children.length - visible));
-  shelf.scrollLeft = first * cardW;
-  for (const c of shelf.children) c.style.transform = '';
+  const max = shelf.scrollWidth - shelf.clientWidth;
+  const target = card.offsetLeft - shelf.offsetLeft + card.offsetWidth / 2 - shelf.clientWidth / 2;
+  shelf.scrollLeft = Math.max(0, Math.min(max, Math.round(target)));
 }
 
 // --------------------------------------------------------------- arcade
@@ -139,22 +153,27 @@ function artHtml(spec, big = false) {
   }).join('');
   const heroSrc = spec.hero.image || emojiSrc(spec.hero.emoji);
   const ground = spec.genre === 'shooter' ? 'transparent' : spec.theme.ground;
-  return `<div style="position:absolute;inset:0;background:linear-gradient(${spec.theme.skyTop},${spec.theme.skyBottom})"></div>${scn}<div class="ground" style="background:${ground}"></div><img class="hero" src="${heroSrc}" alt="">`;
+  return `<div class="bg" style="background:linear-gradient(${spec.theme.skyTop},${spec.theme.skyBottom})"></div>${scn}<div class="ground" style="background:${ground}"></div><img class="hero" src="${heroSrc}" alt="">`;
 }
 
 const GENRE_LABEL = { catcher: 'Catch', runner: 'Run & Jump', maze: 'Maze', shooter: 'Zap' };
 
 function renderArcade() {
   const shelf = $('shelf');
-  const cards = [`<div class="game-card new focusable" data-act="surprise">
-      <div><div class="big">🎲</div><div class="title">Surprise me!</div><div class="by">No phone? I'll dream one up</div></div>
+  const cards = [`<div class="game-card new focusable" role="button" data-act="surprise" aria-label="Surprise me: the TV imagines a game">
+      <div class="new-inner"><span class="new-icon">${icon('dice', { size: 140 })}</span><div class="title">Surprise me!</div><div class="by">No phone handy? The TV will imagine one.</div></div>
     </div>`];
+  // An empty arcade still explains itself (first run, or every game tidied away).
+  if (!state.games.length) {
+    cards.push(`<div class="game-card empty" aria-hidden="true"><div class="new-inner"><span class="new-icon">${icon('phone', { size: 96 })}</span><div class="title">No games yet</div><div class="by">Scan the code with a phone and say your idea. It shows up right here.</div></div></div>`);
+  }
   for (const g of state.games) {
-    cards.push(`<div class="game-card focusable" data-id="${esc(g.id)}">
+    cards.push(`<div class="game-card focusable" role="button" data-id="${esc(g.id)}" aria-label="${esc(`${g.title}, by ${g.author}`)}">
       <div class="art">${artHtml({ ...g, hero: g.hero, theme: g.theme, genre: g.genre })}</div>
       <div class="badge">${esc(GENRE_LABEL[g.genre] || g.genre)}</div>
       ${state.freshIds.has(g.id) ? '<div class="fresh">NEW</div>' : ''}
-      <div class="meta"><div class="title">${esc(g.title)}</div><div class="by">by ${esc(g.author)}${g.remixOf ? ' · remix' : ''}</div>${g.best ? `<div class="best">🏆 ${esc(g.best.name)} · ${g.best.score}</div>` : ''}</div>
+      <div class="meta"><div class="title">${esc(g.title)}</div><div class="by">by ${esc(g.author)}${g.remixOf ? ' · remix' : ''}</div>${g.best ? `<div class="best">${icon('trophy', { size: 24 })}<span>${esc(g.best.name)}</span> · ${g.best.score}</div>` : ''}</div>
+      <div class="go">${icon('play', { size: 22 })}Play</div>
     </div>`);
   }
   shelf.innerHTML = cards.join('');
@@ -177,35 +196,60 @@ const SURPRISES = [
 ];
 
 // --------------------------------------------------------------- create
-const STEPS = ['Reading your idea', 'Choosing the hero', 'Painting the world', 'Hiding the treasure', 'Teaching the baddies', 'Testing the fun'];
+const STEPS = ['Reading your idea', 'Painting the world', 'Teaching the baddies', 'Robots testing the fun'];
+const QUOTE_WORDS = 28; // long ideas are trimmed on screen so the steps stay visible
 let stepTimer = null;
+let failTimer = null;
 function showCreating(prompt, author, remix) {
   creatingSince = performance.now();
+  clearTimeout(failTimer);
   $('createError').classList.add('hidden');
+  // Remember where we came from so a failed attempt can put things back.
+  if (state.screen !== 'creating') state.returnTo = state.screen;
   if (state.game) state.game.pause();
-  $('createBy').textContent = remix ? `${author} wants to remix it` : `${author} says`;
-  $('createQuote').textContent = `“${prompt}”`;
+  $('pauseMenu').classList.add('hidden');
+  $('createBy').innerHTML = `${icon(remix ? 'remix' : 'sparkles', { size: 40 })}<span class="who">${esc(author)}</span> ${remix ? 'wants to remix it' : 'imagined'}`;
+  // Their words arrive one at a time: this is their idea coming to life.
+  const all = String(prompt ?? '').split(/\s+/).filter(Boolean);
+  const words = all.slice(0, QUOTE_WORDS);
+  if (all.length > words.length) words[words.length - 1] += '…';
+  const quote = $('createQuote');
+  quote.classList.toggle('long', words.length > 12);
+  quote.classList.toggle('longer', words.length > 20);
+  quote.innerHTML = `<span class="mark">“</span>${words.map((w, i) => `<span class="w" style="animation-delay:${(i * 0.09).toFixed(2)}s">${esc(w)}</span>`).join(' ')}<span class="w mark" style="animation-delay:${(words.length * 0.09).toFixed(2)}s">”</span>`;
   const steps = $('createSteps');
-  steps.innerHTML = '';
+  steps.innerHTML = STEPS.slice(0, 4).map((t) => `<div class="step"><span class="bullet">${icon('sparkles', { size: 20 })}</span>${t}</div>`).join('');
   let i = 0;
   clearInterval(stepTimer);
   const tick = () => {
-    const prev = steps.lastElementChild;
-    if (prev) prev.classList.add('done');
-    if (i < STEPS.length) {
-      const d = document.createElement('div');
-      d.textContent = `${STEPS[i++]}…`;
-      steps.appendChild(d);
-      if (steps.children.length > 4) steps.firstElementChild.remove();
-    }
+    const els = [...steps.children];
+    els.forEach((el, k) => {
+      el.classList.toggle('done', k < i);
+      el.classList.toggle('now', k === i);
+      if (k < i) el.querySelector('.bullet').innerHTML = icon('check', { size: 20 });
+    });
+    if (i < els.length) i += 1;
+    else clearInterval(stepTimer); // every step is lit: nothing left to animate
   };
   tick();
-  stepTimer = setInterval(tick, 900);
+  stepTimer = setInterval(tick, 850);
   show('creating');
   sfx.unlock();
   sfx.tone(440, 0.4, { type: 'sine', vol: 0.08, slide: 440 });
 }
-function doneCreating() { clearInterval(stepTimer); }
+function doneCreating() { clearInterval(stepTimer); clearTimeout(failTimer); }
+
+// Back to wherever the family was before the attempt (a paused game reopens its pause menu).
+function leaveCreating() {
+  doneCreating();
+  if (state.screen !== 'creating') return;
+  const to = state.returnTo;
+  if (to === 'play' && state.game) {
+    show('play');
+    $('pauseMenu').classList.remove('hidden');
+    refocus();
+  } else show(to === 'intro' || to === 'end' ? (state.current ? to : 'arcade') : 'arcade');
+}
 
 async function surprise() {
   const prompt = SURPRISES[Math.floor(Math.random() * SURPRISES.length)];
@@ -215,9 +259,8 @@ async function surprise() {
     // The websocket "created" event normally drives the UI; this is the fallback when no socket.
     if (!state.ws || state.ws.readyState !== 1) onCreated(game);
   } catch (e) {
-    doneCreating();
-    toast(e.message);
-    show('arcade');
+    toast(friendly(e));
+    leaveCreating();
   }
 }
 
@@ -231,44 +274,77 @@ async function onCreated(game) {
   doneCreating();
   state.freshIds.add(game.id);
   loadArcade().catch(() => {});
-  openIntro(game);
+  openIntro(game).catch(() => {});
 }
 
 // ---------------------------------------------------------------- intro
 const HOW = {
-  catcher: ['◀ ▶ move', 'Catch the goodies', 'Dodge the baddies'],
-  runner: ['OK or ▲ jump', 'Press twice to double-jump', 'Grab goodies in the air'],
-  maze: ['◀ ▶ ▲ ▼ walk', 'Collect everything', 'Then find the exit'],
-  shooter: ['◀ ▶ move', 'OK to zap (hold for auto)', 'Catch goodies for bonus'],
+  catcher: [['dpad', 'Left and right to move'], ['star', 'Catch the goodies'], ['bolt', 'Dodge the baddies']],
+  runner: [['ok', 'OK to jump, twice for a double'], ['star', 'Grab goodies in the air'], ['bolt', 'Hop over the baddies']],
+  maze: [['dpad', 'Arrows to walk'], ['star', 'Collect every goodie'], ['home', 'Then find the exit']],
+  shooter: [['dpad', 'Left and right to move'], ['ok', 'OK to zap (hold it)'], ['star', 'Catch goodies for bonus']],
 };
+const MOD_LABEL = { night: 'Night', lava_floor: 'Lava floor', giant_hero: 'Giant hero', tiny_hero: 'Tiny hero', double_points: 'Double points', reverse_controls: 'Backwards controls', wind: 'Windy', rainbow_trail: 'Rainbow trail', slow_motion: 'Slow-mo', bouncy: 'Bouncy', boss: 'Boss fight', confetti: 'Confetti' };
 async function openIntro(gameOrId) {
-  const game = typeof gameOrId === 'string' ? await api(`/api/games/${gameOrId}`) : gameOrId;
+  let game = gameOrId;
+  if (typeof gameOrId === 'string') {
+    try { game = await api(`/api/games/${gameOrId}`); } catch (e) {
+      // Removed on another TV, or the server blinked: stay put and refresh the shelf.
+      toast(friendly(e, 'Could not open that game. Try again!'));
+      loadArcade().catch(() => {});
+      throw e;
+    }
+  }
+  // A game left running behind the intro (e.g. a remix arrived mid-play) would keep its music going.
+  if (state.game) { state.game.stop(); state.game = null; }
   state.current = game;
   const s = game.spec;
   $('introArt').innerHTML = artHtml(s, true);
   $('introGenre').textContent = GENRE_LABEL[s.genre] || s.genre;
   $('introTitle').textContent = s.title;
+  $('introTitle').classList.toggle('long', s.title.length > 24);
   $('introTagline').textContent = s.tagline;
   $('introNarration').textContent = s.narration.intro;
-  $('introHow').innerHTML = HOW[s.genre].map((h) => `<span>${esc(h)}</span>`).join('');
+  $('introHow').innerHTML = HOW[s.genre].map(([ic, text]) => `<div class="tile"><span class="icon">${icon(ic, { size: 30 })}</span>${esc(text)}</div>`).join('');
   const goodies = s.goodies.map((g) => `<img src="${emojiSrc(g.emoji)}" alt="${esc(g.name)}">`).join('');
   const hazards = s.hazards.map((h) => `<img src="${emojiSrc(h.emoji)}" alt="${esc(h.name)}">`).join('');
-  const mods = (s.modifiers || []).map((m) => m.replace('_', ' ')).join(' · ');
-  $('introCast').innerHTML = `<span class="grp">Get ${goodies}</span><span class="grp">Avoid ${hazards}</span>${mods ? `<span class="grp">✨ ${esc(mods)}</span>` : ''}`;
+  const mods = (s.modifiers || []).map((m) => `<span>${esc(MOD_LABEL[m] || m)}</span>`).join('');
+  $('introCast').innerHTML = `<div class="group grab"><span class="label">Grab</span><span class="items">${goodies}</span></div>`
+    + `<div class="group dodge"><span class="label">Dodge</span><span class="items">${hazards}</span></div>`
+    + (mods ? `<div class="mods">${mods}</div>` : '');
   $('introBy').textContent = `Made by ${game.author} · “${game.prompt}”`;
   const t = game.playtest;
+  const mode = t?.difficulty === 'hard' ? ` · ${icon('bolt', { size: 22 })} hard mode` : t?.difficulty === 'easy' ? ` · ${icon('leaf', { size: 22 })} easy mode` : '';
   $('introTested').innerHTML = t
-    ? `🤖 Robot-tested ${t.runs}× · <b>${Math.round(t.kidWinRate * 100)}%</b> of kid runs won · about <b>${Math.max(10, Math.round(t.avgWinSeconds / 5) * 5)}s</b> to win${t.difficulty === 'hard' ? ' · 🔥 hard mode' : t.difficulty === 'easy' ? ' · 🌱 easy mode' : ''}`
+    ? `${icon('robot', { size: 30 })}<span>Robots played it ${t.runs}×: kids won <b>${Math.round(t.kidWinRate * 100)}%</b>, in about <b>${Math.max(10, Math.round(t.avgWinSeconds / 5) * 5)}s</b>${mode}</span>`
     : '';
-  renderBoard($('introBoard'), game.scores, null, '🏆 Family best');
+  const best = game.scores?.[0];
+  $('introBoard').innerHTML = best ? `<span class="row">${icon('trophy', { size: 24 })}Family best: <b>${esc(best.name)}</b> · ${best.score}</span>` : '';
   show('intro');
   say(`${s.title}. ${s.narration.intro}`);
 }
 
-function renderBoard(el, scores, highlightAt, label) {
+// The family podium on the end screen: top three, with this run highlighted.
+function renderPodium(el, scores, highlightAt, record) {
   if (!scores?.length) { el.innerHTML = ''; return; }
-  el.innerHTML = `<span class="row">${label}</span>` + scores.slice(0, 3).map((r, i) =>
-    `<span class="row${r.at === highlightAt ? ' me' : ''}">${['🥇', '🥈', '🥉'][i]} ${esc(r.name)} · ${r.score}${r.won ? '' : ' (so close)'}</span>`).join('');
+  el.innerHTML = scores.slice(0, 3).map((r, i) => `<li class="${r.at === highlightAt ? 'me' : ''}">
+      <span class="rank">${i + 1}</span><span class="who">${esc(r.name)}</span><span class="pts">${r.score} pts${r.won ? '' : ' · so close'}</span>
+      ${r.at === highlightAt && record ? `<span class="record">New record!</span>` : ''}
+    </li>`).join('');
+}
+
+// One short burst of confetti, only when someone wins.
+function celebrate() {
+  const box = $('confetti');
+  const colors = ['#ffd166', '#06d6a0', '#ff6b81', '#4cc9f0', '#c77dff'];
+  box.innerHTML = Array.from({ length: 70 }, (_, i) => {
+    const left = Math.random() * 100;
+    const delay = Math.random() * 0.6;
+    const dur = 2.2 + Math.random() * 1.4;
+    return `<i style="left:${left.toFixed(1)}%;background:${colors[i % colors.length]};animation-delay:${delay.toFixed(2)}s;animation-duration:${dur.toFixed(2)}s"></i>`;
+  }).join('');
+  clearTimeout(celebrate.h);
+  celebrate.h = setTimeout(() => { box.innerHTML = ''; }, 4200);
 }
 
 // Who's on the couch right now, for the scoreboard.
@@ -283,24 +359,33 @@ async function startGame() {
   const rec = state.current;
   if (!rec) return;
   if (state.game) state.game.stop();
-  const game = new Game($('canvas'), rec.spec, { onEvent: onGameEvent });
+  hush();
+  // Events from a game we've already left (e.g. its delayed "end") must not pull the TV back.
+  let game = null; // the constructor already emits events, so this is assigned after
+  game = new Game($('canvas'), rec.spec, { onEvent: (e) => { if (game && state.game === game) onGameEvent(e); } });
   state.game = game;
   for (const id of state.phones.keys()) game.addPlayer(id);
-  show('play');
   $('pauseMenu').classList.add('hidden');
-  await game.load();
+  show('play');
+  try { await game.load(); } catch (e) {
+    console.error(e);
+    if (state.game === game) { toast('That game would not load. Try another!'); backToArcade(); }
+    return;
+  }
+  if (state.game !== game) return; // they backed out while it loaded
   game.start();
   api(`/api/games/${rec.id}/played`, { method: 'POST' }).catch(() => {});
 }
 
 function onGameEvent(e) {
-  if (e.type === 'end') {
+  if (e.type === 'end' && state.screen === 'play') {
     const s = state.current.spec;
     $('endEmoji').innerHTML = `<img src="${s.hero.image || emojiSrc(s.hero.emoji)}" alt="">`;
     $('endTitle').textContent = e.won ? 'You did it!' : 'So close!';
     $('endLine').textContent = e.won ? s.narration.win : s.narration.lose;
-    $('endScore').textContent = `⭐ ${e.score} points`;
+    $('endScore').innerHTML = `${icon('star', { size: 40 })}${e.score} points`;
     $('endBoard').innerHTML = '';
+    if (e.won) celebrate();
     const seconds = state.game.t || 0;
     state.game.stop();
     show('end');
@@ -311,23 +396,27 @@ function onGameEvent(e) {
       .then(({ rank, scores }) => {
         rec.scores = scores;
         const mine = rank ? scores[rank - 1] : null;
-        renderBoard($('endBoard'), scores, mine?.at, rank === 1 && e.won ? '🎉 New family record!' : '🏆 Family best');
-        if (rank === 1 && e.won) { sfx.win(); say('New family record!'); }
+        renderPodium($('endBoard'), scores, mine?.at, rank === 1 && e.won);
+        if (rank === 1 && e.won) { sfx.win(); say('New family record!', { queue: true }); }
       })
       .catch(() => {});
   }
 }
 
 function pauseGame() {
-  if (state.screen !== 'play' || !state.game) return;
+  if (state.screen !== 'play') return;
+  if (!state.game) return backToArcade();
   if (['play', 'countdown'].includes(state.game.state)) {
     state.game.pause();
     $('pauseMenu').classList.remove('hidden');
     refocus();
   } else if (state.game.state === 'paused') resumeGame();
+  // Still loading: Back means "never mind". (Just won/lost: the end screen is a beat away.)
+  else if (['loading', 'ready'].includes(state.game.state)) backToArcade();
 }
 function resumeGame() {
   $('pauseMenu').classList.add('hidden');
+  setFocus(null);
   state.game?.resume();
 }
 
@@ -336,7 +425,7 @@ function toast(text) {
   t.textContent = text;
   t.classList.add('show');
   clearTimeout(toast.h);
-  toast.h = setTimeout(() => t.classList.remove('show'), 2400);
+  toast.h = setTimeout(() => t.classList.remove('show'), Math.max(2400, String(text).length * 60));
 }
 
 // ------------------------------------------------------------- actions
@@ -345,10 +434,11 @@ function activate(el) {
   sfx.unlock();
   if (state.screen === 'arcade') {
     if (el.dataset.act === 'surprise') return surprise();
-    if (el.dataset.id) return openIntro(el.dataset.id);
+    if (el.dataset.id) return openIntro(el.dataset.id).catch(() => {});
   }
   if (el.id === 'btnTts') { speech.on = !speech.on; store.set('cgs-tts', speech.on ? 'on' : 'off'); renderTts(); if (speech.on) say('Read aloud is on'); else hush(); return; }
   if (el.id === 'btnHide') return askConfirm();
+  if (el.id === 'btnRetry') return retryBoot();
   if (el.dataset.confirm) return closeConfirm(el.dataset.confirm === 'yes');
   if (el.id === 'btnPlay' || el.id === 'btnAgain') return startGame();
   if (el.id === 'btnBack' || el.id === 'btnEndArcade') return backToArcade();
@@ -365,20 +455,21 @@ function askConfirm() {
 }
 async function closeConfirm(yes) {
   $('confirm').classList.add('hidden');
-  if (!yes || !state.current) return refocus();
+  if (!yes || !state.current) return setFocus($('btnHide'));
   try {
     await api(`/api/games/${state.current.id}/hidden`, { method: 'POST', body: { hidden: true } });
     toast('Removed from the arcade');
     state.current = null;
-    await loadArcade();
+    await loadArcade().catch(() => {});
     show('arcade');
-  } catch { toast('Could not remove that game'); refocus(); }
+  } catch { toast('Could not remove that game'); setFocus($('btnHide')); }
 }
 
 function backToArcade() {
   hush();
   state.game?.stop();
   state.game = null;
+  $('pauseMenu').classList.add('hidden');
   show('arcade');
 }
 function back() {
@@ -386,7 +477,7 @@ function back() {
   if (state.screen === 'play') return pauseGame();
   if (state.screen === 'intro' || state.screen === 'end') return backToArcade();
   // On the home screen, Back hands control to the TV (Vega host closes the app).
-  if (state.screen === 'arcade' && window.ReactNativeWebView) window.ReactNativeWebView.postMessage('exit');
+  if ((state.screen === 'arcade' || state.screen === 'offline') && window.ReactNativeWebView) window.ReactNativeWebView.postMessage('exit');
 }
 
 // --------------------------------------------------------------- input
@@ -404,12 +495,16 @@ document.addEventListener('keydown', (e) => {
   const a = keyAction(e);
   if (!a) return;
   e.preventDefault();
+  // This room moved to another screen; someone pressing a button here wants it back.
+  if (!state.ws && booted) connect();
   const playing = state.screen === 'play' && state.game && ['play', 'countdown'].includes(state.game.state);
   if (playing) {
     if (a === 'back' || a === 'playpause') return pauseGame();
     state.game.input('tv', a === 'ok' ? 'action' : a, true);
     return;
   }
+  // Holding OK must not fire it again and again (e.g. several "Surprise me" requests).
+  if (e.repeat && a !== 'left' && a !== 'right' && a !== 'up' && a !== 'down') return;
   if (a === 'back') return back();
   if (a === 'playpause') return state.screen === 'play' ? pauseGame() : activate(current());
   if (a === 'ok') return activate(current());
@@ -442,24 +537,42 @@ function cheer(emoji, name) {
 // ------------------------------------------------------------ websocket
 function sendWs(msg) { if (state.ws?.readyState === 1) state.ws.send(JSON.stringify(msg)); }
 
+const MAX_CHIPS = 6; // the join card has room for about two rows
 function renderPlayers() {
-  const chips = [...state.phones.values()].map((p) => `<span class="chip" style="background:${p.color}">${esc(p.name)}</span>`);
-  $('playerChips').innerHTML = chips.join('') || '<span style="color:var(--muted);font-size:22px">No phones yet</span>';
+  const all = [...state.phones.values()];
+  const chips = all.slice(0, MAX_CHIPS).map((p) => `<span class="chip" style="background:${p.color}"><span class="dot">${icon('user', { size: 16 })}</span><span class="name">${esc(p.name)}</span></span>`);
+  if (all.length > MAX_CHIPS) chips.push(`<span class="chip more">+${all.length - MAX_CHIPS}</span>`);
+  $('playerChips').innerHTML = chips.join('') || '<span class="empty">No phones yet. Scan the code to join!</span>';
+}
+const nextColor = () => PLAYER_COLORS[(state.phones.size + 1) % PLAYER_COLORS.length];
+
+// A small pill so a dropped connection is visible without getting in the way.
+function netStatus(text) {
+  const el = $('netStatus');
+  el.classList.toggle('hidden', !text);
+  if (text && el.lastChild?.textContent !== text) el.innerHTML = `<span class="dot"></span>${esc(text)}`;
 }
 
+let retryMs = 1500;
 function connect() {
+  clearTimeout(connect.h);
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   const ws = new WebSocket(`${proto}://${location.host}/ws?room=${state.room}&role=tv`);
   state.ws = ws;
-  ws.onopen = () => sendWs({ t: 'screen', screen: state.screen, gameId: state.current?.id || null, title: state.current?.spec?.title || '', genre: state.current?.spec?.genre || '' });
+  ws.onopen = () => {
+    retryMs = 1500;
+    netStatus('');
+    sendWs({ t: 'screen', screen: state.screen, gameId: state.current?.id || null, title: state.current?.spec?.title || '', genre: state.current?.spec?.genre || '' });
+  };
   ws.onmessage = (ev) => {
-    const m = JSON.parse(ev.data);
+    let m;
+    try { m = JSON.parse(ev.data); } catch { return; }
     if (m.t === 'join') {
-      const color = PLAYER_COLORS[(state.phones.size + 1) % 4];
-      state.phones.set(m.id, { name: m.name, color });
+      const known = state.phones.get(m.id);
+      state.phones.set(m.id, { name: m.name, color: known?.color || nextColor() });
       renderPlayers();
       if (state.game && state.game.addPlayer(m.id)) toast(`${m.name} joined the game!`);
-      else toast(`${m.name} connected`);
+      else if (!known || known.name !== m.name) toast(`${m.name} connected`);
     } else if (m.t === 'leave') {
       const p = state.phones.get(m.id);
       state.phones.delete(m.id);
@@ -467,16 +580,23 @@ function connect() {
       renderPlayers();
       if (p) toast(`${p.name} left`);
     } else if (m.t === 'players') {
-      // Phones that were already connected before this TV page loaded.
-      for (const p of m.players) if (!state.phones.has(p.id)) state.phones.set(p.id, { name: p.name, color: PLAYER_COLORS[(state.phones.size + 1) % 4] });
+      // The room's phones right now (on first connect and after every reconnect):
+      // drop anyone who left while we were offline, keep colours for those still here.
+      const ids = new Set(m.players.map((p) => p.id));
+      for (const id of state.phones.keys()) if (!ids.has(id)) { state.phones.delete(id); state.game?.removePlayer(id); }
+      for (const p of m.players) {
+        const known = state.phones.get(p.id);
+        state.phones.set(p.id, { name: p.name, color: known?.color || nextColor() });
+        state.game?.addPlayer(p.id);
+      }
       renderPlayers();
     } else if (m.t === 'input') {
       state.game?.input(m.id, m.action, m.down);
     } else if (m.t === 'nav') {
       if (m.action === 'pause') pauseGame();
       else if (m.action === 'play') { if (state.screen === 'play' && state.game?.state === 'paused') resumeGame(); else if (state.screen === 'intro') startGame(); }
-      else if (m.action === 'again') { if (state.current) startGame(); }
-      else if (m.action === 'back') back();
+      else if (m.action === 'again') { if (state.current && ['intro', 'end', 'play'].includes(state.screen)) startGame(); }
+      else if (m.action === 'back' && state.screen !== 'arcade') back(); // a phone never closes the TV app
     } else if (m.t === 'creating') {
       showCreating(m.prompt, m.author, m.remix);
     } else if (m.t === 'created') {
@@ -484,40 +604,75 @@ function connect() {
     } else if (m.t === 'react') {
       cheer(m.emoji, m.name);
     } else if (m.t === 'create_failed') {
-      doneCreating();
-      if (m.error && state.screen === 'creating') {
+      if (state.screen !== 'creating') return doneCreating();
+      if (m.error) {
+        // A safety nudge: give everyone time to read (and hear) it before moving on.
+        doneCreating();
         $('createError').textContent = m.error;
         $('createError').classList.remove('hidden');
         say(m.error);
-        setTimeout(() => { if (state.screen === 'creating') show(state.current ? 'intro' : 'arcade'); }, 4200);
+        failTimer = setTimeout(leaveCreating, 4200);
       } else {
         toast('Hmm, that one fizzled. Try again!');
-        show(state.current ? 'intro' : 'arcade');
+        leaveCreating();
       }
     }
   };
-  ws.onclose = () => setTimeout(connect, 1500);
+  ws.onclose = (ev) => {
+    if (state.ws !== ws) return;
+    if (ev.code === 4000) {
+      // Another TV opened this room. Don't fight over it; take it back on the next button press.
+      state.ws = null;
+      netStatus('Playing on another screen');
+      return;
+    }
+    netStatus('Reconnecting…');
+    connect.h = setTimeout(connect, retryMs);
+    retryMs = Math.min(retryMs * 1.6, 10000);
+  };
 }
 
 // ----------------------------------------------------------------- boot
+// Boot is safe to retry: each step is skipped once it has worked.
+let booted = false;
 async function boot() {
-  let room = store.get('cgs-room');
-  const info = room ? await api(`/api/rooms/${room}`) : await api('/api/rooms', { method: 'POST' });
-  state.room = info.code;
-  store.set('cgs-room', info.code);
-  $('roomCode').textContent = info.code;
-  $('joinUrl').textContent = info.phoneUrl.replace(/^https?:\/\//, '');
-  $('qr').src = `/api/rooms/${info.code}/qr.svg`;
-  renderPlayers();
-  renderTts();
-  connect();
+  if (!state.room) {
+    const saved = store.get('cgs-room');
+    const info = saved ? await api(`/api/rooms/${saved}`).catch(() => api('/api/rooms', { method: 'POST' })) : await api('/api/rooms', { method: 'POST' });
+    state.room = info.code;
+    store.set('cgs-room', info.code);
+    $('roomCode').textContent = info.code;
+    $('joinUrl').textContent = info.phoneUrl.replace(/^https?:\/\//, '');
+    $('qr').innerHTML = `<img src="/api/rooms/${info.code}/qr.svg" alt="" width="176" height="176">`;
+    connect();
+  }
   await loadArcade();
+  booted = true;
   show('arcade');
   // Deep links for demos/recording: /tv/?game=seed-dino (&autoplay=1)
   const params = new URLSearchParams(location.search);
   if (params.get('game')) {
-    await openIntro(params.get('game')).catch(() => {});
-    if (params.get('autoplay')) startGame();
+    try {
+      await openIntro(params.get('game'));
+      if (params.get('autoplay')) startGame();
+    } catch { /* openIntro already said so */ }
   }
 }
-boot().catch((e) => { console.error(e); toast('Could not reach the studio server'); });
+// Server unreachable: say so kindly on screen, and keep trying in the background.
+function bootFailed(e) {
+  console.warn('[boot]', e?.message || e);
+  show('offline');
+  clearTimeout(bootFailed.h);
+  bootFailed.h = setTimeout(retryBoot, 5000);
+}
+function retryBoot() {
+  if (booted) return;
+  clearTimeout(bootFailed.h);
+  $('offlineText').textContent = 'Trying again…';
+  boot().catch((e) => { $('offlineText').textContent = 'Still can’t reach it. We’ll keep trying.'; bootFailed(e); });
+}
+
+hydrateIcons();
+renderPlayers();
+renderTts();
+boot().catch(bootFailed);

@@ -96,7 +96,12 @@ export class RoomHub {
     ws.on('close', () => {
       clearInterval(ping);
       if (role === 'tv') {
-        if (room.tv === ws) { room.tv = null; this.toPhones(room, { t: 'tv_left' }); }
+        if (room.tv === ws) {
+          // Nothing is on screen any more: phones go back to making games.
+          room.tv = null; room.screen = 'arcade'; room.gameId = null;
+          this.toPhones(room, { t: 'tv_left' });
+          this.toPhones(room, { t: 'screen', screen: 'arcade', gameId: null, title: '', genre: '' });
+        }
       } else {
         room.phones.delete(id);
         this.toTv(room, { t: 'leave', id });

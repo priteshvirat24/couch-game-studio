@@ -30,8 +30,8 @@ const PKG = JSON.parse(fss.readFileSync(path.join(ROOT, 'package.json'), 'utf8')
 const CSP = [
   "default-src 'self'",
   "script-src 'self'",
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "font-src 'self' https://fonts.gstatic.com",
+  "style-src 'self' 'unsafe-inline'",
+  "font-src 'self'",
   "img-src 'self' data: blob:",
   "media-src 'self' blob:",
   "connect-src 'self' ws: wss:",
@@ -87,7 +87,9 @@ export async function createStudio(config) {
   app.use(express.json({ limit: '3mb' }));
 
   // ---------------------------------------------------------------- pages
-  const statics = { maxAge: '1h', setHeaders: (res, file) => { if (file.endsWith('.html')) res.set('Cache-Control', 'no-cache'); } };
+  // App code revalidates on every load (cheap ETag 304s) so updates reach TVs immediately;
+  // images, emoji and drawings are cached for a long time.
+  const statics = { setHeaders: (res) => res.set('Cache-Control', 'no-cache') };
   app.get('/', (req, res) => res.redirect('/tv/'));
   app.get('/favicon.ico', (req, res) => res.redirect(301, '/assets/icon.svg'));
   app.use('/tv', express.static(path.join(ROOT, 'public/tv'), statics));

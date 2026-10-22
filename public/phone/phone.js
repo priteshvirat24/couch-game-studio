@@ -1,31 +1,38 @@
 // Phone companion: say/type a game idea, snap a drawing as the hero,
 // remix the game on the TV, and play as a controller.
 
+import { hydrateIcons } from '/assets/icons.js';
+
 const $ = (id) => document.getElementById(id);
+hydrateIcons();
 const room = (location.pathname.split('/p/')[1] || new URLSearchParams(location.search).get('room') || '').toUpperCase().slice(0, 4);
 const store = {
   get(k) { try { return localStorage.getItem(k); } catch { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch {} },
 };
 
-const state = { ws: null, name: store.get('cgs-name') || '', screen: 'arcade', gameId: null, genre: null, title: '', heroImage: null, busy: false };
+const state = { ws: null, name: store.get('cgs-name') || '', screen: 'arcade', gameId: null, genre: null, title: '', heroImage: null, busy: false, posting: false };
 
 $('roomLabel').textContent = room || '?';
 $('nameInput').value = state.name;
 
-function toast(text) {
+// Longer messages (safety nudges, rate limits) stay up long enough to read.
+function toast(text, ms = Math.max(2600, String(text).length * 70)) {
   const t = $('toast');
   t.textContent = text;
   t.classList.add('show');
   clearTimeout(toast.h);
-  toast.h = setTimeout(() => t.classList.remove('show'), 2600);
+  toast.h = setTimeout(() => t.classList.remove('show'), ms);
 }
 const buzz = (ms = 15) => { try { navigator.vibrate?.(ms); } catch {} };
 
 // --------------------------------------------------------------- views
 function view(name) { for (const v of document.querySelectorAll('.view')) v.classList.toggle('active', v.id === name); }
 function tab(name) {
-  for (const t of document.querySelectorAll('.tab')) t.classList.toggle('active', t.dataset.tab === name);
+  for (const t of document.querySelectorAll('.tab')) {
+    t.classList.toggle('active', t.dataset.tab === name);
+    t.setAttribute('aria-selected', String(t.dataset.tab === name));
+  }
   for (const p of document.querySelectorAll('.panel')) p.classList.toggle('active', p.id === `panel-${name}`);
 }
 for (const t of document.querySelectorAll('.tab')) t.addEventListener('click', () => !t.disabled && tab(t.dataset.tab));
@@ -43,16 +50,36 @@ $('nameInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') join(
 
 // ------------------------------------------------------------ websocket
 function send(msg) { if (state.ws?.readyState === 1) state.ws.send(JSON.stringify(msg)); }
-function setStatus(on, text) { $('status').classList.toggle('on', on); $('statusText').textContent = text; }
+// Only touch the live region when the words change, so screen readers don't repeat it.
+function setStatus(on, text) {
+  $('status').classList.toggle('on', on);
+  if ($('statusText').textContent !== text) $('statusText').textContent = text;
+}
 
+let retryMs = 1500;
 function connect() {
+  clearTimeout(connect.h);
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   const ws = new WebSocket(`${proto}://${location.host}/ws?room=${room}&role=phone`);
   state.ws = ws;
-  ws.onopen = () => { send({ t: 'hello', name: state.name }); setStatus(true, `Room ${room}`); };
-  ws.onclose = () => { setStatus(false, 'Reconnecting…'); setTimeout(connect, 1500); };
+  ws.onopen = () => {
+    retryMs = 1500;
+    send({ t: 'hello', name: state.name });
+    setStatus(true, `Room ${room}`);
+    // A "making…" overlay from before the drop may never get its "created": don't leave it stuck.
+    if (state.busy && !state.posting) overlay(false);
+  };
+  ws.onclose = (ev) => {
+    if (state.ws !== ws) return;
+    const full = ev.code === 1013;
+    setStatus(false, full ? 'Room is full' : 'Reconnecting…');
+    if (full) toast('This room already has 8 players. Try again in a bit!');
+    connect.h = setTimeout(connect, full ? 10000 : retryMs);
+    retryMs = Math.min(retryMs * 1.6, 10000);
+  };
   ws.onmessage = (ev) => {
-    const m = JSON.parse(ev.data);
+    let m;
+    try { m = JSON.parse(ev.data); } catch { return; }
     if (m.t === 'welcome') {
       if (!m.tvConnected) toast('Open Couch Game Studio on the TV');
       applyScreen(m.screen, m.gameId);
@@ -71,8 +98,8 @@ function connect() {
         : `“${m.game.title}” is ready on the TV!`;
       r.classList.add('show');
     } else if (m.t === 'create_failed') {
-      overlay(false);
-      toast(m.error || 'That one fizzled. Try again!');
+      // Our own request reports its own (more specific) error when it returns.
+      if (!state.posting) { overlay(false); toast(m.error || 'That one fizzled. Try again!'); }
     } else if (m.t === 'reaction') {
       toast(m.text);
       buzz(40);
@@ -92,9 +119,12 @@ function applyScreen(screen, gameId, title, genre) {
   $('remixTitle').textContent = state.title ? `“${state.title}”` : 'this game';
   if (state.genre) {
     $('pad').dataset.genre = state.genre;
-    $('actionBtn').textContent = { runner: 'JUMP', shooter: 'ZAP', catcher: 'GO', maze: 'GO' }[state.genre];
+    $('actionBtn').textContent = { runner: 'JUMP', shooter: 'ZAP', catcher: 'GO', maze: 'GO' }[state.genre] || 'GO';
   }
-  $('padTitle').textContent = screen === 'play' ? `Playing “${state.title}”` : state.title ? `Next up: “${state.title}”` : 'Waiting for a game on the TV…';
+  // Only name a game while one is actually on the TV (not a stale one from before).
+  $('padTitle').textContent = screen === 'play'
+    ? (state.title ? `Playing “${state.title}”` : 'Playing on the TV')
+    : hasGame && state.title ? `Next up: “${state.title}”` : 'Waiting for a game on the TV…';
   // Jump straight to the controller while a game is running.
   if (screen === 'play') tab('pad');
   else if (screen === 'end' || screen === 'intro') { if (document.querySelector('.tab.active')?.dataset.tab === 'pad') tab('remix'); }
@@ -118,6 +148,16 @@ function setupMic(btn, label, input, idleText) {
     return;
   }
   let rec = null;
+  const idle = () => { rec = null; btn.classList.remove('listening'); btn.setAttribute('aria-pressed', 'false'); label.textContent = idleText; };
+  const SPEECH_ERRORS = {
+    'not-allowed': 'Mic blocked. Type it, or use your keyboard 🎤',
+    'service-not-allowed': 'Mic blocked. Type it, or use your keyboard 🎤',
+    'no-speech': 'I didn’t hear anything. Tap the mic and try again!',
+    'audio-capture': 'No microphone found. Type it instead!',
+    'network': 'Voice needs the internet. Type it instead!',
+    'language-not-supported': 'Voice doesn’t speak this language yet. Type it instead!',
+  };
+  btn.setAttribute('aria-pressed', 'false');
   btn.addEventListener('click', () => {
     if (rec) { rec.stop(); return; }
     rec = new SR();
@@ -126,15 +166,16 @@ function setupMic(btn, label, input, idleText) {
     rec.continuous = false;
     const before = input.value;
     btn.classList.add('listening');
+    btn.setAttribute('aria-pressed', 'true');
     label.textContent = 'Listening… tell me everything!';
     buzz(20);
     rec.onresult = (e) => {
       const text = [...e.results].map((r) => r[0].transcript).join(' ');
-      input.value = (before ? `${before} ` : '') + text;
+      input.value = ((before ? `${before} ` : '') + text).slice(0, input.maxLength > 0 ? input.maxLength : undefined);
     };
-    rec.onerror = (e) => { if (e.error === 'not-allowed') toast('Mic blocked. Type it, or use your keyboard 🎤'); };
-    rec.onend = () => { rec = null; btn.classList.remove('listening'); label.textContent = idleText; };
-    rec.start();
+    rec.onerror = (e) => { if (SPEECH_ERRORS[e.error]) toast(SPEECH_ERRORS[e.error]); }; // 'aborted' is us stopping it
+    rec.onend = idle;
+    try { rec.start(); } catch { idle(); toast('The mic is busy. Try again in a second!'); }
   });
 }
 setupMic($('micBtn'), $('micLabel'), $('promptInput'), 'Tap and tell me. Anything goes!');
@@ -159,14 +200,27 @@ $('remixIdeas').addEventListener('click', (e) => { const b = e.target.closest('.
 // Center-crop to a square, shrink to 256px, and (optionally) knock out the
 // background by sampling the border color. Great for crayon drawings on paper.
 let photoImg = null;
+const MAX_PHOTO_BYTES = 30 * 1024 * 1024; // phone cameras top out well below this; it only guards decode memory
 $('photoInput').addEventListener('change', async (e) => {
   const file = e.target.files?.[0];
   if (!file) return;
+  const reset = (msg) => { $('photoInput').value = ''; toast(msg); };
+  if (file.type && !file.type.startsWith('image/')) return reset('That’s not a picture. Try a photo of your drawing!');
+  if (file.size > MAX_PHOTO_BYTES) return reset('That picture is too big. Try a smaller one!');
   const url = URL.createObjectURL(file);
-  photoImg = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
-  renderPhoto();
-  $('photoPreview').classList.remove('hidden');
-  buzz();
+  try {
+    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+    if (!img.naturalWidth || !img.naturalHeight) throw new Error('empty image');
+    photoImg = img;
+    renderPhoto();
+    $('photoPreview').classList.remove('hidden');
+    buzz();
+  } catch {
+    // e.g. HEIC on a browser that can't decode it
+    reset('That picture didn’t open. Try a JPG or PNG photo!');
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 });
 $('bgToggle').addEventListener('change', () => photoImg && renderPhoto());
 $('photoClear').addEventListener('click', () => { photoImg = null; state.heroImage = null; $('photoPreview').classList.add('hidden'); $('photoInput').value = ''; });
@@ -216,11 +270,24 @@ function removeBackground(ctx) {
 }
 
 // -------------------------------------------------------- make / remix
+// Every failure becomes one short, kid-friendly sentence.
 async function post(path, body) {
-  const res = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  let res;
+  try {
+    res = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  } catch {
+    throw new Error('Can’t reach the TV studio. Is your phone on the same Wi-Fi?');
+  }
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || 'Something went wrong');
-  return data;
+  if (res.ok) return data;
+  const wait = Number(res.headers.get('Retry-After'));
+  const msg = {
+    409: 'The TV is already making a game. Watch the TV, then try yours!',
+    413: 'That picture is too big. Try a smaller one!',
+    422: data.error || 'Let’s try a different idea!', // the safety nudge, worded by the server
+    429: `Whoa, so many ideas! Try again in ${wait > 0 ? `${wait} second${wait === 1 ? '' : 's'}` : 'a moment'}.`,
+  }[res.status];
+  throw new Error(msg || (res.status < 500 && data.error) || 'The game machine hiccuped. Try again!');
 }
 
 $('makeBtn').addEventListener('click', async () => {
@@ -228,6 +295,7 @@ $('makeBtn').addEventListener('click', async () => {
   if (prompt.length < 3) { toast('Tell me your game idea first!'); return; }
   if (state.busy) return;
   overlay(true, 'Making your game…');
+  state.posting = true;
   $('makeResult').classList.remove('show');
   buzz(30);
   try {
@@ -236,6 +304,7 @@ $('makeBtn').addEventListener('click', async () => {
   } catch (e) {
     toast(e.message);
   } finally {
+    state.posting = false;
     overlay(false);
   }
 });
@@ -246,6 +315,7 @@ $('remixBtn').addEventListener('click', async () => {
   if (instruction.length < 2) { toast('What should change?'); return; }
   if (state.busy) return;
   overlay(true, 'Remixing…');
+  state.posting = true;
   buzz(30);
   try {
     await post(`/api/games/${state.gameId}/remix`, { instruction, author: state.name, room });
@@ -253,6 +323,7 @@ $('remixBtn').addEventListener('click', async () => {
   } catch (e) {
     toast(e.message);
   } finally {
+    state.posting = false;
     overlay(false);
   }
 });

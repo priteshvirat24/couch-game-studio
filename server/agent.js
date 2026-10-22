@@ -11,6 +11,7 @@
 // (structured output) and then normalized + balanced again by the server.
 
 import { Agent, BedrockModel, tool } from '@strands-agents/sdk';
+import { OpenAIModel } from '@strands-agents/sdk/models/openai';
 import { z } from 'zod';
 import { balance } from 'couch-engine/playtest';
 import { normalizeSpec, GENRES, MODIFIERS, GENRE_HELP } from './spec.js';
@@ -84,14 +85,25 @@ export function playtestTool(difficulty) {
 }
 
 /**
- * Design (or remix) a game with the agent. Throws if Bedrock is unavailable; the caller
- * falls back to a single Converse call, then to the offline designer.
+ * The model behind the Game Director. Bedrock offers two ways in:
+ *  - "mantle": Bedrock's OpenAI-compatible endpoint (open-weight models such as Qwen3,
+ *    DeepSeek, Kimi), authenticated with a short-lived token minted from AWS credentials.
+ *  - "runtime": the Bedrock Converse API (Nova, and partner models where the account has access).
  */
-export async function directGame(request, { region, modelId, difficulty = 'normal', timeoutMs = 60_000 } = {}) {
+export function directorModel({ api = 'runtime', region, modelId, maxTokens = 4000 }) {
+  if (api === 'mantle') return new OpenAIModel({ api: 'chat', modelId, maxTokens, temperature: 0.7, bedrockMantleConfig: { region } });
+  return new BedrockModel({ region, modelId, maxTokens });
+}
+
+/**
+ * Design (or remix) a game with the agent. Throws if Bedrock is unavailable; the caller
+ * falls back down the designer chain, ending at the offline designer.
+ */
+export async function directGame(request, { api = 'runtime', region, modelId, difficulty = 'normal', timeoutMs = 60_000 } = {}) {
   const agent = new Agent({
     name: 'Game Director',
     description: 'Designs and playtests family TV games from a description.',
-    model: new BedrockModel({ region, modelId, maxTokens: 4000 }),
+    model: directorModel({ api, region, modelId }),
     systemPrompt: SYSTEM,
     tools: [playtestTool(difficulty)],
     structuredOutputSchema: GameSpecSchema,
