@@ -1,6 +1,6 @@
 # Devpost submission pack: Couch Game Studio
 
-> Copy each section into the matching Devpost field. Items marked **TODO** need your input (video link, repo URL, GitHub username).
+> Copy each section into the matching Devpost field. The only remaining **TODO** is the demo video link.
 
 ## Tracks
 - **Primary track:** Fire TV (Vega OS)
@@ -35,7 +35,7 @@
 `vega-os` `react-native-for-vega` `amazon-devices-webview` `fire-tv` `amazon-bedrock` `anthropic-claude` `aws-sdk` `node.js` `express` `websockets` `canvas` `web-audio` `emojilib` `twemoji` `cloudflare-tunnel`
 
 ## Repo, video and links
-- **GitHub repo:** **TODO.** Either public with the Apache-2.0 license (already in the repo), or private and shared with `testing@devpost.com` and the reviewers `chris-trag`, `knmeiss`, `giolaq`, `anishamalde`, `mosesroth`, `emersonsklar`.
+- **GitHub repo:** https://github.com/priteshvirat24/couch-game-studio (public, Apache-2.0)
 - **Demo video (under 3 min, YouTube/Vimeo, public):** **TODO.**
 
 ## Was this built during the hackathon?
@@ -53,8 +53,8 @@ Yes. Everything in this repository was built during the submission window (Octob
 - The provider chain backs off for 60 s after an account or permission error and falls through to the Claude API, then the offline designer, so the TV never hangs.
 
 ## Open Source mini challenge
-- **Repo URL:** **TODO**
-- **GitHub username:** **TODO**
+- **Repo URL:** https://github.com/priteshvirat24/couch-game-studio
+- **GitHub username:** priteshvirat24
 - **License:** Apache-2.0
 - **What it is:** a new open-source project: a reusable "spec-driven game engine" pattern for TV.
   - A dependency-free canvas engine (`public/engine/engine.js`) with 4 genres, 12 modifiers and 4-player co-op.
