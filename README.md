@@ -167,6 +167,22 @@ cloudflared tunnel --url http://localhost:8787
 
 Phone links follow whatever address the TV used. Set `PUBLIC_URL` to pin one.
 
+### On AWS (permanent HTTPS address)
+
+[`infra/aws/studio.yaml`](infra/aws/studio.yaml) is a CloudFormation stack: one Graviton EC2 instance (Amazon Linux 2023, Node 22, hardened systemd service) behind a **CloudFront** distribution that gives the studio a permanent `https://….cloudfront.net` address with WebSocket support.
+
+- The server only answers CloudFront: its security group allows the CloudFront origin-facing prefix list only, and every request must carry a secret header that CloudFront adds (kept in Secrets Manager, fetched at boot).
+- No SSH and no AWS keys on the server: it uses an IAM role for Bedrock Mantle, and Systems Manager for admin and updates. IMDSv2 only, encrypted disk.
+- Images, emoji and drawings are cached at the edge; app pages, the API and `/ws` are never cached.
+- The stack waits until `/healthz` answers before it reports success.
+
+```bash
+infra/aws/deploy.sh             # create or update the stack, prints the StudioUrl (first run ~10 min)
+infra/aws/update.sh             # ship the latest main to the running server, keeping every game
+```
+
+Then put the `StudioUrl` in `vega/src/config.ts` and rebuild the Fire TV app once; the address never changes. Running cost is roughly $10 a month (t4g.micro, Elastic IP, 16 GB disk, one secret; CloudFront traffic stays within the free allowance at family scale). Remove everything with `aws cloudformation delete-stack --stack-name couch-game-studio`, which also deletes the games stored on the server.
+
 ### On Fire TV (Vega OS)
 
 Step-by-step guide with a test checklist: [docs/FIRE_TV_HANDOFF.md](docs/FIRE_TV_HANDOFF.md).
@@ -203,6 +219,8 @@ Everything is optional and set through environment variables (see [`.env.example
 | `LLM_TIMEOUT_MS` | `60000` | Time limit for one design request |
 | `PLAYTEST` | `on` | Robot playtesting of every new game (`off` to skip) |
 | `CREATE_PER_MINUTE` | `8` | Make and remix requests allowed per minute, per device |
+| `ORIGIN_SECRET` | none | Behind a CDN: reject any request without this value in `X-Origin-Verify` (`/healthz` stays open) |
+| `TRUST_PROXY` | `true` | Proxy hops in front of the server, used to find each device's IP for rate limiting (`1` behind CloudFront) |
 
 ## Production-ready server
 
@@ -216,11 +234,11 @@ Everything is optional and set through environment variables (see [`.env.example
 ## Tests
 
 ```bash
-npm test                        # 22 server tests
+npm test                        # 24 server tests
 cd vega && npm run lint && npm test    # Vega app: lint + 4 Jest tests
 ```
 
-The server suite covers the GameSpec contract, the offline designer and remixes, the agent's structured-output schema and `playtest_game` tool, and **end-to-end API and WebSocket tests**: making and remixing games, unsafe ideas, *"super hard"* staying hard, family scores, hiding games, rooms and QR codes, the phone-to-TV relay, and rate limiting. `couch-engine` has its own 10 tests.
+The server suite covers the GameSpec contract, the offline designer and remixes, the agent's structured-output schema and `playtest_game` tool, and **end-to-end API and WebSocket tests**: making and remixing games, unsafe ideas, *"super hard"* staying hard, family scores, hiding games, rooms and QR codes, the phone-to-TV relay, rate limiting, and the CDN origin guard. `couch-engine` has its own 10 tests.
 
 [GitHub Actions](.github/workflows/ci.yml) runs the server tests on Node 22 and 24, builds the Docker image and smoke-tests it, then lints and tests the Vega app.
 
@@ -241,13 +259,14 @@ couch-game-studio/
 │   ├── rooms.js        TV ⇄ phone WebSocket rooms
 │   ├── ratelimit.js    per-device token bucket
 │   ├── seeds.js        starter games
-│   └── *.test.js       23 tests
+│   └── *.test.js       24 tests
 ├── public/
 │   ├── tv/             10-foot TV app
 │   ├── phone/          phone companion
 │   └── assets/         Fredoka font, SVG icon family, app icons
 ├── vega/               React Native for Vega app (Fire TV)
 ├── docs/               submission pack, demo script, screenshots
+├── infra/aws/          CloudFormation stack, deploy and update scripts
 ├── Dockerfile
 └── .github/workflows/ci.yml
 ```

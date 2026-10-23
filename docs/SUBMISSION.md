@@ -30,7 +30,7 @@
 - **Kid safety is layered.** Personal details (emails, phone numbers, addresses, links) are stripped before anything is stored or sent to a model; cartoon violence is softened ("kill" → "bonk", "gun" → "water blaster", "blood" → "ketchup"); unsuitable topics get a friendly nudge; names are sanitized; drawings never leave the studio server.
 - **Never a dead end.** If no model is reachable, an offline designer reads the sentence (verbs → genre, nouns → sprites via the open emojilib dictionary), so there is always a game.
 - **Built for the 10-foot screen.** A React Native for Vega app with a branded native splash screen, a 512 px icon, TTFD reporting for cold and warm starts, and a friendly retry screen. Inside: spatial D-pad navigation, one clear focus style, a 3-2-1-GO countdown, gold glow for "grab it" and red glow for "dodge it", self-hosted Fredoka type, an authored icon family and procedural chiptune music.
-- **Production-ready.** Express 5 server with CSP and security headers, per-device rate limiting, atomic storage, graceful shutdown, health checks, a non-root Docker image, and GitHub Actions CI. 22 server tests (including end-to-end API and WebSocket tests), 10 engine tests and 4 Vega app tests.
+- **Production-ready.** Express 5 server with CSP and security headers, per-device rate limiting, atomic storage, graceful shutdown, health checks, a non-root Docker image, and GitHub Actions CI. 24 server tests (including end-to-end API and WebSocket tests), 10 engine tests and 4 Vega app tests.
 
 **What's next.**
 - Alexa voice input straight from the Fire TV remote.
