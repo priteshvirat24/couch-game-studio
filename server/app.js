@@ -47,6 +47,16 @@ function lanAddress() {
   return 'localhost';
 }
 
+// Constant-time check of the CDN's secret header. /healthz stays open for local checks.
+function originGuard(secret) {
+  if (!secret) return () => true;
+  const want = Buffer.from(secret);
+  return (req) => {
+    const got = Buffer.from(String(req.headers['x-origin-verify'] || ''));
+    return got.length === want.length && crypto.timingSafeEqual(got, want);
+  };
+}
+
 // Errors that should reach the kid as a friendly sentence (never a stack trace).
 function sendError(res, err, fallback) {
   const status = err instanceof UnsafeRequestError ? 422 : err.status || 500;
@@ -72,7 +82,9 @@ export async function createStudio(config) {
 
   const app = express();
   app.disable('x-powered-by');
-  app.set('trust proxy', true);
+  app.set('trust proxy', config.trustProxy);
+  const fromOrigin = originGuard(config.originSecret);
+  app.use((req, res, next) => (req.path === '/healthz' || fromOrigin(req) ? next() : res.status(403).end()));
   app.use(compression());
   app.use((req, res, next) => {
     res.set({
@@ -257,6 +269,6 @@ export async function createStudio(config) {
   });
 
   const server = http.createServer(app);
-  hub.attach(server);
+  hub.attach(server, { verify: fromOrigin });
   return { app, server, store, hub, close: () => new Promise((r) => { hub.close(); server.close(() => r()); }) };
 }

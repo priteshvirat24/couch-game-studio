@@ -131,3 +131,28 @@ test('rate limiting protects the expensive endpoints', async () => {
   await fs.rm(cfg.dataDir, { recursive: true, force: true });
   assert.deepEqual(codes, [201, 201, 429]);
 });
+
+test('behind a CDN, only requests carrying the origin secret get through', async () => {
+  const cfg = { ...loadConfig({ ORIGIN_SECRET: 'shh-test-secret', TRUST_PROXY: '1' }), dataDir: await fs.mkdtemp(path.join(os.tmpdir(), 'cgs-origin-')) };
+  const s = await createStudio(cfg);
+  await new Promise((r) => s.server.listen(0, '127.0.0.1', r));
+  const url = `http://127.0.0.1:${s.server.address().port}`;
+  const ok = { 'x-origin-verify': 'shh-test-secret' };
+  const statuses = [
+    (await fetch(`${url}/tv/`)).status,
+    (await fetch(`${url}/tv/`, { headers: { 'x-origin-verify': 'shh-test-wrong!' } })).status,
+    (await fetch(`${url}/tv/`, { headers: ok })).status,
+    (await fetch(`${url}/healthz`)).status,
+  ];
+  const { code } = await (await fetch(`${url}/api/rooms`, { method: 'POST', headers: ok })).json();
+  const wsOpens = (headers) => new Promise((r) => {
+    const ws = new WebSocket(`${url.replace('http', 'ws')}/ws?room=${code}&role=tv`, { headers });
+    ws.once('open', () => { ws.close(); r(true); });
+    ws.once('error', () => r(false));
+  });
+  const ws = [await wsOpens({}), await wsOpens(ok)];
+  await s.close();
+  await fs.rm(cfg.dataDir, { recursive: true, force: true });
+  assert.deepEqual(statuses, [403, 403, 200, 200]);
+  assert.deepEqual(ws, [false, true]);
+});

@@ -1,0 +1,333 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  Couch Game Studio on AWS: one Graviton EC2 instance runs the Node studio server (TV app,
+  phone app, WebSocket relay, Game Director on Bedrock Mantle) behind a CloudFront
+  distribution that provides the permanent HTTPS address. The instance only accepts
+  traffic from CloudFront that carries a secret origin header. Deploy with infra/aws/deploy.sh.
+
+Metadata:
+  AWSToolsMetrics:
+    AWSAgentToolkit: aws-cloudformation@3
+  com.aws.cloudformation.Context:
+    why: >-
+      Fire TV WebView needs a stable HTTPS URL baked into the Vega app, and phones join by
+      QR code over the internet. A single small instance keeps cost low; CloudFront adds
+      TLS, WebSocket support and edge caching for static assets without a custom domain.
+    must:
+      - All regional resources stay in the project's selected Region (eu-north-1).
+      - The instance accepts port 8787 only from the CloudFront origin-facing prefix list.
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC for the instance (the default VPC is fine).
+  CloudFrontPrefixListId:
+    Type: String
+    AllowedPattern: '^pl-[0-9a-f]+$'
+    Description: ID of com.amazonaws.global.cloudfront.origin-facing in this Region.
+  InstanceType:
+    Type: String
+    Default: t4g.micro
+    AllowedValues: [t4g.micro, t4g.small]
+  ImageId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64
+  GitRef:
+    Type: String
+    Default: main
+    Description: Branch or tag of the public repo to run.
+  LlmProvider:
+    Type: String
+    Default: mantle
+    AllowedValues: [auto, mantle, agent, converse, offline]
+  BedrockDailyLimit:
+    Type: Number
+    Default: 150
+    MinValue: 0
+    Description: Bedrock designs per day before the offline designer takes over.
+
+Resources:
+  OriginSecret:
+    Type: AWS::SecretsManager::Secret
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Shared secret CloudFront sends in X-Origin-Verify so the server can reject direct hits.
+    Properties:
+      Description: Couch Game Studio CloudFront-to-origin verification header value.
+      GenerateSecretString:
+        PasswordLength: 48
+        ExcludePunctuation: true
+
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Lets the server call Bedrock Mantle, be managed by Systems Manager (no SSH), and read its origin secret.
+        must:
+          - No long-lived keys on the instance; credentials come from this role via IMDSv2.
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ec2.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore
+        - !Sub arn:${AWS::Partition}:iam::aws:policy/AmazonBedrockMantleInferenceAccess
+      Policies:
+        - PolicyName: studio
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !Ref OriginSecret
+              - Effect: Allow
+                Action: bedrock:CallWithBearerToken
+                Resource: '*'
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref InstanceRole]
+
+  ServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Metadata:
+      com.aws.cloudformation.Context:
+        must:
+          - Never open ingress to 0.0.0.0/0; CloudFront is the only way in. Admin access is through SSM Session Manager.
+    Properties:
+      GroupDescription: Couch Game Studio server, reachable from CloudFront only
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8787
+          ToPort: 8787
+          SourcePrefixListId: !Ref CloudFrontPrefixListId
+          Description: CloudFront origin-facing
+
+  ElasticIP:
+    Type: AWS::EC2::EIP
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: A fixed public address, so the CloudFront origin hostname survives instance stop/start and replacement.
+    Properties:
+      Domain: vpc
+
+  Distribution:
+    Type: AWS::CloudFront::Distribution
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: >-
+          Permanent HTTPS address for the Fire TV app and phones. App pages, API and the /ws
+          WebSocket are never cached; images, emoji and drawings are cached at the edge.
+        must:
+          - OriginReadTimeout must stay above the server's slowest game design (LLM_TIMEOUT_MS).
+    Properties:
+      DistributionConfig:
+        Comment: Couch Game Studio
+        Enabled: true
+        HttpVersion: http2and3
+        IPV6Enabled: true
+        PriceClass: PriceClass_200
+        Origins:
+          - Id: studio
+            DomainName: !Join ['', ['ec2-', !Join ['-', !Split ['.', !Ref ElasticIP]], '.', !Ref 'AWS::Region', '.compute.amazonaws.com']]
+            CustomOriginConfig:
+              HTTPPort: 8787
+              OriginProtocolPolicy: http-only
+              OriginReadTimeout: 60
+              OriginKeepaliveTimeout: 30
+            OriginCustomHeaders:
+              - HeaderName: X-Origin-Verify
+                HeaderValue: !Sub '{{resolve:secretsmanager:${OriginSecret}:SecretString}}'
+        DefaultCacheBehavior:
+          TargetOriginId: studio
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
+          CachedMethods: [GET, HEAD]
+          Compress: true
+          CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad # Managed-CachingDisabled
+          OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac # Managed-AllViewerExceptHostHeader
+        CacheBehaviors:
+          - PathPattern: /assets/*
+            TargetOriginId: studio
+            ViewerProtocolPolicy: redirect-to-https
+            Compress: true
+            CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6 # Managed-CachingOptimized
+          - PathPattern: /sprites/*
+            TargetOriginId: studio
+            ViewerProtocolPolicy: redirect-to-https
+            Compress: true
+            CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+          - PathPattern: /emoji/*
+            TargetOriginId: studio
+            ViewerProtocolPolicy: redirect-to-https
+            Compress: true
+            CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: >-
+          Boots Amazon Linux 2023, installs Node 22, runs the studio as a hardened systemd
+          service from the public repo, and signals CloudFormation once /healthz answers.
+          Later code updates go through /usr/local/bin/cgs-update (infra/aws/update.sh).
+        must:
+          - IMDSv2 only.
+          - The origin secret is fetched at boot, never written into user data.
+    Properties:
+      LaunchTemplateData:
+        ImageId: !Ref ImageId
+        InstanceType: !Ref InstanceType
+        IamInstanceProfile: { Arn: !GetAtt InstanceProfile.Arn }
+        SecurityGroupIds: [!Ref ServerSecurityGroup]
+        MetadataOptions:
+          HttpTokens: required
+          HttpPutResponseHopLimit: 1
+          HttpEndpoint: enabled
+        BlockDeviceMappings:
+          - DeviceName: /dev/xvda
+            Ebs: { VolumeSize: 16, VolumeType: gp3, Encrypted: true, DeleteOnTermination: true }
+        TagSpecifications:
+          - ResourceType: instance
+            Tags: [{ Key: Name, Value: couch-game-studio }]
+        UserData:
+          Fn::Base64: !Sub
+            - |
+              #!/bin/bash
+              set -Eeuo pipefail
+              exec > >(tee -a /var/log/cgs-bootstrap.log) 2>&1
+              dnf install -y -q aws-cfn-bootstrap git
+              signal() { /opt/aws/bin/cfn-signal -e "$1" --stack ${AWS::StackName} --resource Instance --region ${AWS::Region} || true; }
+              trap 'signal 1' ERR
+
+              # 1 GB swap: npm install and the agent are comfortable on a 1 GB instance with it.
+              if [ ! -f /swapfile ]; then
+                dd if=/dev/zero of=/swapfile bs=1M count=1024 status=none
+                chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
+                echo '/swapfile none swap sw 0 0' >> /etc/fstab
+              fi
+
+              # Node 22 from nodejs.org, checked against the published SHA-256.
+              DIST=https://nodejs.org/dist/latest-v22.x
+              curl -fsSL "$DIST/SHASUMS256.txt" -o /tmp/node.sums
+              NODE_TAR=$(awk '/linux-arm64\.tar\.xz$/ {print $2}' /tmp/node.sums)
+              curl -fsSL "$DIST/$NODE_TAR" -o "/tmp/$NODE_TAR"
+              (cd /tmp && grep " $NODE_TAR\$" node.sums | sha256sum -c -)
+              tar -xJf "/tmp/$NODE_TAR" -C /usr/local --strip-components=1
+
+              id cgs >/dev/null 2>&1 || useradd --system --create-home --home-dir /opt/couch-game-studio --shell /sbin/nologin cgs
+              install -d -o cgs -g cgs -m 750 /var/lib/couch-game-studio
+              runuser -u cgs -- git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
+              echo '${GitRef}' > /etc/couch-game-studio.ref
+
+              SECRET=$(aws secretsmanager get-secret-value --region ${AWS::Region} --secret-id '${OriginSecret}' --query SecretString --output text)
+              umask 077
+              cat > /etc/couch-game-studio.env <<ENV
+              NODE_ENV=production
+              PORT=8787
+              HOST=0.0.0.0
+              PUBLIC_URL=https://${DomainName}
+              DATA_DIR=/var/lib/couch-game-studio
+              AWS_REGION=${AWS::Region}
+              TRUST_PROXY=1
+              ORIGIN_SECRET=$SECRET
+              LLM_PROVIDER=${LlmProvider}
+              LLM_TIMEOUT_MS=25000
+              BEDROCK_DAILY_LIMIT=${BedrockDailyLimit}
+              ENV
+              umask 022
+
+              cat > /etc/systemd/system/couch-game-studio.service <<'UNIT'
+              [Unit]
+              Description=Couch Game Studio
+              After=network-online.target
+              Wants=network-online.target
+
+              [Service]
+              User=cgs
+              WorkingDirectory=/opt/couch-game-studio/app
+              EnvironmentFile=/etc/couch-game-studio.env
+              ExecStart=/usr/local/bin/node server/index.js
+              Restart=always
+              RestartSec=2
+              NoNewPrivileges=true
+              ProtectSystem=strict
+              ProtectHome=true
+              ReadWritePaths=/var/lib/couch-game-studio
+              PrivateTmp=true
+              ProtectKernelTunables=true
+              ProtectControlGroups=true
+              RestrictSUIDSGID=true
+              LimitNOFILE=65536
+
+              [Install]
+              WantedBy=multi-user.target
+              UNIT
+
+              cat > /usr/local/bin/cgs-update <<'UPDATE'
+              #!/bin/bash
+              # Fetch a branch or tag of the studio, install dependencies, restart, wait for health.
+              set -euo pipefail
+              REF=${!1:-$(cat /etc/couch-game-studio.ref)}
+              APP=/opt/couch-game-studio/app
+              as_cgs() { runuser -u cgs -- env HOME=/opt/couch-game-studio "$@"; }
+              [ -d "$APP/.git" ] || as_cgs git clone --quiet https://github.com/priteshvirat24/couch-game-studio.git "$APP"
+              cd "$APP"
+              as_cgs git fetch --quiet --depth 1 origin "$REF"
+              as_cgs git reset --quiet --hard FETCH_HEAD
+              as_cgs /usr/local/bin/npm ci --omit=dev --no-audit --no-fund --loglevel=error
+              echo "$REF" > /etc/couch-game-studio.ref
+              systemctl restart couch-game-studio
+              for i in $(seq 1 60); do
+                if curl -fsS http://127.0.0.1:8787/healthz >/dev/null; then echo "studio up at $(git rev-parse --short HEAD)"; exit 0; fi
+                sleep 1
+              done
+              journalctl -u couch-game-studio -n 50 --no-pager
+              exit 1
+              UPDATE
+              chmod 755 /usr/local/bin/cgs-update
+
+              systemctl daemon-reload
+              systemctl enable couch-game-studio
+              /usr/local/bin/cgs-update '${GitRef}'
+              signal 0
+            - DomainName: !GetAtt Distribution.DomainName
+
+  Instance:
+    Type: AWS::EC2::Instance
+    CreationPolicy:
+      ResourceSignal:
+        Count: 1
+        Timeout: PT20M
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Runs the studio. Games, drawings and scores live on its encrypted root volume under /var/lib/couch-game-studio.
+        must:
+          - Replacing the instance starts with an empty arcade (starter games only); back up /var/lib/couch-game-studio first.
+    Properties:
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+
+  ElasticIPAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      AllocationId: !GetAtt ElasticIP.AllocationId
+      InstanceId: !Ref Instance
+
+Outputs:
+  StudioUrl:
+    Description: Permanent HTTPS address. Put it in vega/src/config.ts.
+    Value: !Sub https://${Distribution.DomainName}
+  TvUrl:
+    Value: !Sub https://${Distribution.DomainName}/tv/
+  InstanceId:
+    Description: For SSM Session Manager and infra/aws/update.sh.
+    Value: !Ref Instance
+  DistributionId:
+    Value: !Ref Distribution

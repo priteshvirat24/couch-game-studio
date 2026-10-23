@@ -48,8 +48,8 @@ export class RoomHub {
     try { return await fn(); } finally { room.busy = false; }
   }
 
-  attach(server) {
-    const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 16 * 1024 });
+  attach(server, { verify = () => true } = {}) {
+    const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 16 * 1024, verifyClient: ({ req }) => verify(req) });
     wss.on('connection', (ws, req) => this.onConnection(ws, req));
     // Forget rooms nobody has used for a while.
     this.sweeper = setInterval(() => {

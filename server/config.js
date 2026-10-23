@@ -16,5 +16,11 @@ export function loadConfig(env = process.env) {
     // Robot playtesting on every new game (set PLAYTEST=off to skip).
     playtest: env.PLAYTEST !== 'off',
     logLevel: env.LOG_LEVEL || 'info',
+    // Behind a CDN: only accept requests that carry this secret in X-Origin-Verify
+    // (the CDN adds it), so nobody can bypass the CDN and hit the server directly.
+    originSecret: env.ORIGIN_SECRET || '',
+    // Proxy hops in front of the server, for the client IP used by rate limiting.
+    // 1 behind CloudFront; "true" trusts every X-Forwarded-For entry (local tunnels).
+    trustProxy: env.TRUST_PROXY === undefined || env.TRUST_PROXY === 'true' ? true : Number(env.TRUST_PROXY) || false,
   };
 }
