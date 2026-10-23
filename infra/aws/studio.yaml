@@ -1,9 +1,9 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >-
-  Couch Game Studio on AWS: one Graviton EC2 instance runs the Node studio server (TV app,
-  phone app, WebSocket relay, Game Director on Bedrock Mantle) behind a CloudFront
-  distribution that provides the permanent HTTPS address. The instance only accepts
-  traffic from CloudFront that carries a secret origin header. Deploy with infra/aws/deploy.sh.
+  Couch Game Studio on AWS: one Graviton EC2 instance with a fixed Elastic IP runs the Node
+  studio server (TV app, phone app, WebSocket relay, Game Director on Bedrock Mantle) behind
+  Caddy, which serves a permanent HTTPS address (<ip>.sslip.io) with an automatic Let's Encrypt
+  certificate. Deploy with infra/aws/deploy.sh.
 
 Metadata:
   AWSToolsMetrics:
@@ -11,20 +11,17 @@ Metadata:
   com.aws.cloudformation.Context:
     why: >-
       Fire TV WebView needs a stable HTTPS URL baked into the Vega app, and phones join by
-      QR code over the internet. A single small instance keeps cost low; CloudFront adds
-      TLS, WebSocket support and edge caching for static assets without a custom domain.
+      QR code over the internet. A single small instance keeps cost low. CloudFront was the
+      first choice but needs account verification by AWS Support; Caddy plus an sslip.io name
+      for the Elastic IP gives a trusted certificate and WebSockets without a custom domain.
     must:
       - All regional resources stay in the project's selected Region (eu-north-1).
-      - The instance accepts port 8787 only from the CloudFront origin-facing prefix list.
+      - The Node server listens on 127.0.0.1 only; Caddy on 80/443 is the only public entry.
 
 Parameters:
   VpcId:
     Type: AWS::EC2::VPC::Id
     Description: VPC for the instance (the default VPC is fine).
-  CloudFrontPrefixListId:
-    Type: String
-    AllowedPattern: '^pl-[0-9a-f]+$'
-    Description: ID of com.amazonaws.global.cloudfront.origin-facing in this Region.
   InstanceType:
     Type: String
     Default: t4g.micro
@@ -47,22 +44,11 @@ Parameters:
     Description: Bedrock designs per day before the offline designer takes over.
 
 Resources:
-  OriginSecret:
-    Type: AWS::SecretsManager::Secret
-    Metadata:
-      com.aws.cloudformation.Context:
-        why: Shared secret CloudFront sends in X-Origin-Verify so the server can reject direct hits.
-    Properties:
-      Description: Couch Game Studio CloudFront-to-origin verification header value.
-      GenerateSecretString:
-        PasswordLength: 48
-        ExcludePunctuation: true
-
   InstanceRole:
     Type: AWS::IAM::Role
     Metadata:
       com.aws.cloudformation.Context:
-        why: Lets the server call Bedrock Mantle, be managed by Systems Manager (no SSH), and read its origin secret.
+        why: Lets the server call Bedrock Mantle and be managed by Systems Manager (no SSH).
         must:
           - No long-lived keys on the instance; credentials come from this role via IMDSv2.
     Properties:
@@ -81,9 +67,6 @@ Resources:
             Version: '2012-10-17'
             Statement:
               - Effect: Allow
-                Action: secretsmanager:GetSecretValue
-                Resource: !Ref OriginSecret
-              - Effect: Allow
                 Action: bedrock:CallWithBearerToken
                 Resource: '*'
 
@@ -96,89 +79,35 @@ Resources:
     Type: AWS::EC2::SecurityGroup
     Metadata:
       com.aws.cloudformation.Context:
+        why: A public website for phones and TVs anywhere, so HTTPS (and HTTP for redirects and certificate checks) is open to everyone.
         must:
-          - Never open ingress to 0.0.0.0/0; CloudFront is the only way in. Admin access is through SSM Session Manager.
+          - Only 80 and 443. The Node port is never exposed, and there is no SSH; admin access is through SSM Session Manager.
     Properties:
-      GroupDescription: Couch Game Studio server, reachable from CloudFront only
+      GroupDescription: Couch Game Studio web server (HTTPS via Caddy)
       VpcId: !Ref VpcId
       SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 8787
-          ToPort: 8787
-          SourcePrefixListId: !Ref CloudFrontPrefixListId
-          Description: CloudFront origin-facing
+        - { IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIp: 0.0.0.0/0, Description: HTTPS and WebSockets }
+        - { IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIp: 0.0.0.0/0, Description: HTTP redirect and ACME challenge }
 
   ElasticIP:
     Type: AWS::EC2::EIP
     Metadata:
       com.aws.cloudformation.Context:
-        why: A fixed public address, so the CloudFront origin hostname survives instance stop/start and replacement.
+        why: A fixed public address, so the sslip.io hostname (and the URL baked into the Fire TV app) survives instance stop/start and replacement.
     Properties:
       Domain: vpc
-
-  Distribution:
-    Type: AWS::CloudFront::Distribution
-    Metadata:
-      com.aws.cloudformation.Context:
-        why: >-
-          Permanent HTTPS address for the Fire TV app and phones. App pages, API and the /ws
-          WebSocket are never cached; images, emoji and drawings are cached at the edge.
-        must:
-          - OriginReadTimeout must stay above the server's slowest game design (LLM_TIMEOUT_MS).
-    Properties:
-      DistributionConfig:
-        Comment: Couch Game Studio
-        Enabled: true
-        HttpVersion: http2and3
-        IPV6Enabled: true
-        PriceClass: PriceClass_200
-        Origins:
-          - Id: studio
-            DomainName: !Join ['', ['ec2-', !Join ['-', !Split ['.', !Ref ElasticIP]], '.', !Ref 'AWS::Region', '.compute.amazonaws.com']]
-            CustomOriginConfig:
-              HTTPPort: 8787
-              OriginProtocolPolicy: http-only
-              OriginReadTimeout: 60
-              OriginKeepaliveTimeout: 30
-            OriginCustomHeaders:
-              - HeaderName: X-Origin-Verify
-                HeaderValue: !Sub '{{resolve:secretsmanager:${OriginSecret}:SecretString}}'
-        DefaultCacheBehavior:
-          TargetOriginId: studio
-          ViewerProtocolPolicy: redirect-to-https
-          AllowedMethods: [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
-          CachedMethods: [GET, HEAD]
-          Compress: true
-          CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad # Managed-CachingDisabled
-          OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac # Managed-AllViewerExceptHostHeader
-        CacheBehaviors:
-          - PathPattern: /assets/*
-            TargetOriginId: studio
-            ViewerProtocolPolicy: redirect-to-https
-            Compress: true
-            CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6 # Managed-CachingOptimized
-          - PathPattern: /sprites/*
-            TargetOriginId: studio
-            ViewerProtocolPolicy: redirect-to-https
-            Compress: true
-            CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
-          - PathPattern: /emoji/*
-            TargetOriginId: studio
-            ViewerProtocolPolicy: redirect-to-https
-            Compress: true
-            CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
 
   LaunchTemplate:
     Type: AWS::EC2::LaunchTemplate
     Metadata:
       com.aws.cloudformation.Context:
         why: >-
-          Boots Amazon Linux 2023, installs Node 22, runs the studio as a hardened systemd
-          service from the public repo, and signals CloudFormation once /healthz answers.
+          Boots Amazon Linux 2023, installs Node 22 and Caddy (both checksum-verified), runs the
+          studio as a hardened systemd service from the public repo, waits for the Elastic IP,
+          and signals CloudFormation once https://<host>/healthz answers with a real certificate.
           Later code updates go through /usr/local/bin/cgs-update (infra/aws/update.sh).
         must:
           - IMDSv2 only.
-          - The origin secret is fetched at boot, never written into user data.
     Properties:
       LaunchTemplateData:
         ImageId: !Ref ImageId
@@ -202,8 +131,8 @@ Resources:
               set -Eeuo pipefail
               exec > >(tee -a /var/log/cgs-bootstrap.log) 2>&1
               dnf install -y -q aws-cfn-bootstrap git
-              signal() { /opt/aws/bin/cfn-signal -e "$1" --stack ${AWS::StackName} --resource Instance --region ${AWS::Region} || true; }
-              trap 'signal 1' ERR
+              signal() { /opt/aws/bin/cfn-signal -e "$1" -r "$2" '${WaitHandle}' || true; }
+              trap 'signal 1 "bootstrap failed, see /var/log/cgs-bootstrap.log"' ERR
 
               # 1 GB swap: npm install and the agent are comfortable on a 1 GB instance with it.
               if [ ! -f /swapfile ]; then
@@ -225,17 +154,15 @@ Resources:
               runuser -u cgs -- git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
               echo '${GitRef}' > /etc/couch-game-studio.ref
 
-              SECRET=$(aws secretsmanager get-secret-value --region ${AWS::Region} --secret-id '${OriginSecret}' --query SecretString --output text)
               umask 077
               cat > /etc/couch-game-studio.env <<ENV
               NODE_ENV=production
               PORT=8787
-              HOST=0.0.0.0
-              PUBLIC_URL=https://${DomainName}
+              HOST=127.0.0.1
+              PUBLIC_URL=https://${Host}
               DATA_DIR=/var/lib/couch-game-studio
               AWS_REGION=${AWS::Region}
               TRUST_PROXY=1
-              ORIGIN_SECRET=$SECRET
               LLM_PROVIDER=${LlmProvider}
               LLM_TIMEOUT_MS=25000
               BEDROCK_DAILY_LIMIT=${BedrockDailyLimit}
@@ -295,15 +222,69 @@ Resources:
               systemctl daemon-reload
               systemctl enable couch-game-studio
               /usr/local/bin/cgs-update '${GitRef}'
-              signal 0
-            - DomainName: !GetAtt Distribution.DomainName
+
+              # Caddy terminates TLS for ${Host}. Wait until the Elastic IP is ours first, so the
+              # certificate authority's check reaches this instance.
+              imds() { local t; t=$(curl -fsS -X PUT http://169.254.169.254/latest/api/token -H 'X-aws-ec2-metadata-token-ttl-seconds: 60'); curl -fsS -H "X-aws-ec2-metadata-token: $t" "http://169.254.169.254/latest/meta-data/$1"; }
+              for i in $(seq 1 120); do [ "$(imds public-ipv4 || true)" = '${ElasticIP}' ] && break; sleep 5; done
+
+              CADDY=2.11.7
+              CADDY_TAR=caddy_${!CADDY}_linux_arm64.tar.gz
+              curl -fsSL "https://github.com/caddyserver/caddy/releases/download/v$CADDY/$CADDY_TAR" -o "/tmp/$CADDY_TAR"
+              curl -fsSL "https://github.com/caddyserver/caddy/releases/download/v$CADDY/caddy_${!CADDY}_checksums.txt" -o /tmp/caddy.sums
+              (cd /tmp && grep " $CADDY_TAR\$" caddy.sums | sha512sum -c -)
+              tar -xzf "/tmp/$CADDY_TAR" -C /usr/local/bin caddy
+              id caddy >/dev/null 2>&1 || useradd --system --home-dir /var/lib/caddy --shell /sbin/nologin caddy
+              install -d -o caddy -g caddy -m 700 /var/lib/caddy
+              install -d -m 755 /etc/caddy
+              cat > /etc/caddy/Caddyfile <<'CADDYFILE'
+              ${Host} {
+              	encode zstd gzip
+              	header Strict-Transport-Security "max-age=31536000"
+              	reverse_proxy 127.0.0.1:8787
+              }
+              CADDYFILE
+              cat > /etc/systemd/system/caddy.service <<'UNIT'
+              [Unit]
+              Description=Caddy (HTTPS for Couch Game Studio)
+              After=network-online.target
+              Wants=network-online.target
+
+              [Service]
+              User=caddy
+              Environment=XDG_DATA_HOME=/var/lib/caddy XDG_CONFIG_HOME=/var/lib/caddy
+              ExecStart=/usr/local/bin/caddy run --config /etc/caddy/Caddyfile
+              ExecReload=/usr/local/bin/caddy reload --config /etc/caddy/Caddyfile
+              Restart=always
+              AmbientCapabilities=CAP_NET_BIND_SERVICE
+              CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+              NoNewPrivileges=true
+              ProtectSystem=strict
+              ProtectHome=true
+              ReadWritePaths=/var/lib/caddy
+              PrivateTmp=true
+              LimitNOFILE=65536
+
+              [Install]
+              WantedBy=multi-user.target
+              UNIT
+              systemctl daemon-reload
+              systemctl enable --now caddy
+
+              # Done when the public HTTPS address answers with a trusted certificate.
+              for i in $(seq 1 60); do
+                if curl -fsS --max-time 10 https://${Host}/healthz >/dev/null; then signal 0 "https://${Host} is up"; exit 0; fi
+                sleep 5
+              done
+              journalctl -u caddy -n 40 --no-pager
+              signal 1 "HTTPS did not come up for ${Host}"
+            - Host: !Join ['', [!Join ['-', !Split ['.', !Ref ElasticIP]], '.sslip.io']]
+
+  WaitHandle:
+    Type: AWS::CloudFormation::WaitConditionHandle
 
   Instance:
     Type: AWS::EC2::Instance
-    CreationPolicy:
-      ResourceSignal:
-        Count: 1
-        Timeout: PT20M
     Metadata:
       com.aws.cloudformation.Context:
         why: Runs the studio. Games, drawings and scores live on its encrypted root volume under /var/lib/couch-game-studio.
@@ -320,14 +301,23 @@ Resources:
       AllocationId: !GetAtt ElasticIP.AllocationId
       InstanceId: !Ref Instance
 
+  Ready:
+    Type: AWS::CloudFormation::WaitCondition
+    DependsOn: ElasticIPAssociation
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: The stack only succeeds once the studio answers over HTTPS on its public address.
+    Properties:
+      Handle: !Ref WaitHandle
+      Count: 1
+      Timeout: '1800'
+
 Outputs:
   StudioUrl:
     Description: Permanent HTTPS address. Put it in vega/src/config.ts.
-    Value: !Sub https://${Distribution.DomainName}
+    Value: !Join ['', ['https://', !Join ['-', !Split ['.', !Ref ElasticIP]], '.sslip.io']]
   TvUrl:
-    Value: !Sub https://${Distribution.DomainName}/tv/
+    Value: !Join ['', ['https://', !Join ['-', !Split ['.', !Ref ElasticIP]], '.sslip.io/tv/']]
   InstanceId:
     Description: For SSM Session Manager and infra/aws/update.sh.
     Value: !Ref Instance
-  DistributionId:
-    Value: !Ref Distribution
