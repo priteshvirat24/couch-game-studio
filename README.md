@@ -182,6 +182,8 @@ infra/aws/deploy.sh             # create or update the stack, prints the StudioU
 infra/aws/update.sh             # ship the latest main to the running server, keeping every game
 ```
 
+Use `update.sh` for code changes. Re-running `deploy.sh` after editing the instance's boot script replaces the server, which starts with an empty arcade.
+
 Put the `StudioUrl` in `vega/src/config.ts` and rebuild the Fire TV app once; the address never changes while the stack exists. Running cost is roughly $10 a month (t4g.micro, public IPv4, 16 GB disk). `aws cloudformation delete-stack --stack-name couch-game-studio` removes everything, including the games stored on the server.
 
 ### On Fire TV (Vega OS)

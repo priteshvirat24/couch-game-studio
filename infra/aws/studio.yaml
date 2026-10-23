@@ -211,7 +211,7 @@ Resources:
               echo "$REF" > /etc/couch-game-studio.ref
               systemctl restart couch-game-studio
               for i in $(seq 1 60); do
-                if curl -fsS http://127.0.0.1:8787/healthz >/dev/null; then echo "studio up at $(git rev-parse --short HEAD)"; exit 0; fi
+                if curl -fsS http://127.0.0.1:8787/healthz >/dev/null; then echo "studio up at $(as_cgs git rev-parse --short HEAD)"; exit 0; fi
                 sleep 1
               done
               journalctl -u couch-game-studio -n 50 --no-pager
