@@ -33,9 +33,10 @@ const bedrock = new BedrockRuntimeClient(process.env.BEDROCK_REGION ? { region: 
 let REGION = process.env.BEDROCK_REGION || process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || null;
 const region = async () => (REGION ||= await bedrock.config.region().catch(() => 'us-east-1'));
 region();
-// Cross-Region inference profiles are named after the geography (us., eu., apac.).
-const geo = (r) => (r.startsWith('eu-') ? 'eu' : r.startsWith('ap-') ? 'apac' : 'us');
-const runtimeModel = (r) => process.env.BEDROCK_MODEL_ID || `${geo(r)}.anthropic.claude-opus-5-5`;
+// Default Converse model: Amazon Nova 2 Lite through the cross-Region inference profile for
+// the Region's geography (eu., us.), or the global profile elsewhere.
+const geo = (r) => (r.startsWith('eu-') ? 'eu' : r.startsWith('us-') ? 'us' : 'global');
+const runtimeModel = (r) => process.env.BEDROCK_MODEL_ID || `${geo(r)}.amazon.nova-2-lite-v1:0`;
 
 const SYSTEM = `You are the game designer inside "Couch Game Studio", a Fire TV app where anyone imagines a
 game out loud and plays it on the TV seconds later. You never write code: you fill in a GameSpec by

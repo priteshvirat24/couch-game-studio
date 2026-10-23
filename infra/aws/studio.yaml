@@ -211,7 +211,7 @@ Resources:
               echo "$REF" > /etc/couch-game-studio.ref
               systemctl restart couch-game-studio
               for i in $(seq 1 60); do
-                if curl -fsS http://127.0.0.1:8787/healthz >/dev/null; then echo "studio up at $(as_cgs git rev-parse --short HEAD)"; exit 0; fi
+                if curl -fsS http://127.0.0.1:8787/healthz >/dev/null; then echo "studio up at $(git rev-parse --short HEAD)"; exit 0; fi
                 sleep 1
               done
               journalctl -u couch-game-studio -n 50 --no-pager
@@ -300,6 +300,73 @@ Resources:
     Properties:
       AllocationId: !GetAtt ElasticIP.AllocationId
       InstanceId: !Ref Instance
+
+  RecoveryAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: If the underlying host fails, EC2 recovers the same instance (same IP, same disk) onto healthy hardware.
+    Properties:
+      AlarmDescription: Couch Game Studio host failed its system status check; recover the instance.
+      Namespace: AWS/EC2
+      MetricName: StatusCheckFailed_System
+      Dimensions: [{ Name: InstanceId, Value: !Ref Instance }]
+      Statistic: Maximum
+      Period: 60
+      EvaluationPeriods: 2
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      AlarmActions: [!Sub 'arn:${AWS::Partition}:automate:${AWS::Region}:ec2:recover']
+
+  RebootAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: If the operating system stops answering its instance status check, reboot it; systemd brings the studio and Caddy back.
+    Properties:
+      AlarmDescription: Couch Game Studio instance failed its status check; reboot it.
+      Namespace: AWS/EC2
+      MetricName: StatusCheckFailed_Instance
+      Dimensions: [{ Name: InstanceId, Value: !Ref Instance }]
+      Statistic: Maximum
+      Period: 60
+      EvaluationPeriods: 3
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      AlarmActions: [!Sub 'arn:${AWS::Partition}:automate:${AWS::Region}:ec2:reboot']
+
+  SnapshotRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: dlm.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub arn:${AWS::Partition}:iam::aws:policy/service-role/AWSDataLifecycleManagerServiceRole
+
+  NightlySnapshots:
+    Type: AWS::DLM::LifecyclePolicy
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Every game, drawing and score lives on the instance's disk; nightly snapshots (kept 7 days) make it restorable.
+        must:
+          - Targets the instance by its Name tag, so adding this policy never changes or replaces the instance.
+    Properties:
+      Description: Couch Game Studio nightly disk snapshots kept 7 days
+      State: ENABLED
+      ExecutionRoleArn: !GetAtt SnapshotRole.Arn
+      PolicyDetails:
+        PolicyType: EBS_SNAPSHOT_MANAGEMENT
+        ResourceTypes: [INSTANCE]
+        TargetTags: [{ Key: Name, Value: couch-game-studio }]
+        Schedules:
+          - Name: nightly
+            CreateRule: { Interval: 24, IntervalUnit: HOURS, Times: ['03:00'] }
+            RetainRule: { Count: 7 }
+            CopyTags: true
 
   Ready:
     Type: AWS::CloudFormation::WaitCondition

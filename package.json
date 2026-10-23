@@ -8,6 +8,7 @@
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
     "test": "node --test server/*.test.js",
+    "test:e2e": "node --test e2e/*.e2e.js",
     "docker:build": "docker build -t couch-game-studio .",
     "docker:run": "docker run -p 8787:8787 -v couch-data:/data couch-game-studio"
   },
@@ -30,5 +31,8 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/priteshvirat24/couch-game-studio.git"
+  },
+  "devDependencies": {
+    "playwright": "^1.64.1"
   }
 }

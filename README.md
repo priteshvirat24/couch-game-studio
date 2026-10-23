@@ -182,7 +182,10 @@ infra/aws/deploy.sh             # create or update the stack, prints the StudioU
 infra/aws/update.sh             # ship the latest main to the running server, keeping every game
 ```
 
-Use `update.sh` for code changes. Re-running `deploy.sh` after editing the instance's boot script replaces the server, which starts with an empty arcade.
+`deploy.sh` shows a change set before applying it and stops if the update could replace the server (a changed boot script or a newer Amazon Linux image), since games live on its disk; `ALLOW_REPLACE=1` overrides. Use `update.sh` for code changes.
+
+- **Self-healing:** a CloudWatch alarm recovers the instance onto healthy hardware if its host fails, and another reboots it if the OS stops responding (systemd brings the studio and Caddy back).
+- **Backups:** Data Lifecycle Manager snapshots the disk every night and keeps 7 days.
 
 Put the `StudioUrl` in `vega/src/config.ts` and rebuild the Fire TV app once; the address never changes while the stack exists. Running cost is roughly $10 a month (t4g.micro, public IPv4, 16 GB disk). `aws cloudformation delete-stack --stack-name couch-game-studio` removes everything, including the games stored on the server.
 
@@ -216,7 +219,7 @@ Everything is optional and set through environment variables (see [`.env.example
 | `DATA_DIR` | `./data` | Where games, drawings and the emoji cache are stored |
 | `AWS_REGION` | your AWS profile's Region | Region for Amazon Bedrock (`BEDROCK_REGION` overrides it) |
 | `BEDROCK_MANTLE_MODELS` | `qwen.qwen3-235b-a22b-2507,moonshotai.kimi-k2.5` | Models the Game Director tries, in order, on Bedrock Mantle |
-| `BEDROCK_MODEL_ID` | see `.env.example` | Model or cross-region inference profile for the Converse API path |
+| `BEDROCK_MODEL_ID` | Amazon Nova 2 Lite (`eu.`/`us.`/`global.amazon.nova-2-lite-v1:0`) | Model or cross-region inference profile for the Converse API path |
 | `BEDROCK_DAILY_LIMIT` | `150` | Bedrock designs per day before the offline designer takes over |
 | `LLM_PROVIDER` | `auto` | `auto` = Mantle → Converse agent → Converse → offline. `mantle`, `agent`, `converse` or `offline` force one designer (offline is always the last resort) |
 | `LLM_TIMEOUT_MS` | `60000` | Time limit for one design request |
@@ -238,12 +241,13 @@ Everything is optional and set through environment variables (see [`.env.example
 
 ```bash
 npm test                        # 24 server tests
+npm run test:e2e                # browser end-to-end: a real TV page and phone page in Chromium
 cd vega && npm run lint && npm test    # Vega app: lint + 4 Jest tests
 ```
 
 The server suite covers the GameSpec contract, the offline designer and remixes, the agent's structured-output schema and `playtest_game` tool, and **end-to-end API and WebSocket tests**: making and remixing games, unsafe ideas, *"super hard"* staying hard, family scores, hiding games, rooms and QR codes, the phone-to-TV relay, rate limiting, and the CDN origin guard. `couch-engine` has its own 10 tests.
 
-[GitHub Actions](.github/workflows/ci.yml) runs the server tests on Node 22 and 24, builds the Docker image and smoke-tests it, then lints and tests the Vega app.
+[GitHub Actions](.github/workflows/ci.yml) runs the server tests on Node 22 and 24, a browser end-to-end test (a phone joins, makes a game, the TV imagines it, and the remote plays and pauses it), builds the Docker image and smoke-tests it, then lints and tests the Vega app.
 
 ## Project structure
 

@@ -30,7 +30,7 @@
 - **Kid safety is layered.** Personal details (emails, phone numbers, addresses, links) are stripped before anything is stored or sent to a model; cartoon violence is softened ("kill" → "bonk", "gun" → "water blaster", "blood" → "ketchup"); unsuitable topics get a friendly nudge; names are sanitized; drawings never leave the studio server.
 - **Never a dead end.** If no model is reachable, an offline designer reads the sentence (verbs → genre, nouns → sprites via the open emojilib dictionary), so there is always a game.
 - **Built for the 10-foot screen.** A React Native for Vega app with a branded native splash screen, a 512 px icon, TTFD reporting for cold and warm starts, and a friendly retry screen. Inside: spatial D-pad navigation, one clear focus style, a 3-2-1-GO countdown, gold glow for "grab it" and red glow for "dodge it", self-hosted Fredoka type, an authored icon family and procedural chiptune music.
-- **Production-ready.** Express 5 server with CSP and security headers, per-device rate limiting, atomic storage, graceful shutdown, health checks, a non-root Docker image, and GitHub Actions CI. It runs live on AWS at https://16-171-214-22.sslip.io: a CloudFormation stack with a Graviton EC2 instance, HTTPS with automatic certificates, an IAM role for Bedrock (no keys on the server), and updates through Systems Manager (no SSH). 24 server tests (including end-to-end API and WebSocket tests), 10 engine tests and 4 Vega app tests.
+- **Production-ready.** Express 5 server with CSP and security headers, per-device rate limiting, atomic storage, graceful shutdown, health checks, a non-root Docker image, and GitHub Actions CI. It runs live on AWS at https://16-171-214-22.sslip.io: a CloudFormation stack with a Graviton EC2 instance, HTTPS with automatic certificates, an IAM role for Bedrock (no keys on the server), updates through Systems Manager (no SSH), CloudWatch auto-recovery and nightly snapshots. 24 server tests (including end-to-end API and WebSocket tests), a browser end-to-end test of the TV and phone in Chromium, 10 engine tests and 4 Vega app tests.
 
 **What's next.**
 - Alexa voice input straight from the Fire TV remote.
@@ -54,9 +54,9 @@ Yes. Both repositories were created and built during the submission window (Octo
 ## AWS Builder mini challenge
 **Services used:**
 - **Amazon Bedrock Mantle**: Bedrock's OpenAI-compatible endpoint, running open-weight models (Qwen3 235B by default, Kimi K2.5 as backup) with short-lived tokens minted from AWS credentials (`@aws/bedrock-token-generator`).
-- **Amazon Bedrock Runtime**: the Converse API with tool use and cross-region inference profiles (`@aws-sdk/client-bedrock-runtime`).
+- **Amazon Bedrock Runtime**: the Converse API with tool use and cross-region inference profiles, defaulting to Amazon Nova 2 Lite (`@aws-sdk/client-bedrock-runtime`).
 - **Strands Agents SDK for TypeScript** (`@strands-agents/sdk`) with `OpenAIModel` + `bedrockMantleConfig`, `BedrockModel`, a custom `tool()`, and structured output.
-- **AWS CloudFormation, Amazon EC2 (Graviton), Elastic IP, AWS Systems Manager, IAM** (`infra/aws/studio.yaml`): the studio's permanent HTTPS home in eu-north-1. The instance role grants Bedrock Mantle (`AmazonBedrockMantleInferenceAccess`), so no keys live on the server; IMDSv2 only; updates ship through SSM Run Command; the stack reports success only after the public HTTPS health check passes.
+- **AWS CloudFormation, Amazon EC2 (Graviton), Elastic IP, AWS Systems Manager, IAM** (`infra/aws/studio.yaml`): the studio's permanent HTTPS home in eu-north-1. The instance role grants Bedrock Mantle (`AmazonBedrockMantleInferenceAccess`), so no keys live on the server; IMDSv2 only; updates ship through SSM Run Command; the stack reports success only after the public HTTPS health check passes; CloudWatch alarms auto-recover or reboot the instance, and Data Lifecycle Manager keeps 7 nightly snapshots.
 
 **How it works (a multi-step agentic pipeline):**
 1. **Safety layer** (`server/safety.js`) strips personal details and softens the words before any model sees them.
