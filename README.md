@@ -276,13 +276,13 @@ couch-game-studio/
 
 ## Open source
 
-The engine is its own project: **[couch-engine](https://github.com/priteshvirat24/couch-engine)** (Apache-2.0, zero dependencies, v1.1.1).
+The engine is its own project: **[couch-engine](https://github.com/priteshvirat24/couch-engine)** (Apache-2.0, zero dependencies, v1.2.0).
 
 - A canvas game engine for TVs: 4 genres, 12 stackable modifiers, 4-player co-op, D-pad controls, chiptune audio.
 - The GameSpec contract: `normalizeSpec()` turns anything into a valid game, and `SPEC_JSON_SCHEMA` is ready to use as a model tool or structured-output schema.
 - A **robot playtester and auto-balancer**. Seeded, deterministic bots play every game in about 20–300 ms. `balance()` tunes speed, spawn rate, lives and goal toward a 60–95% kid win rate with wins in 25–110 seconds, honors `easy | normal | hard`, removes the hardest modifier only as a last resort, and never touches creative choices.
 
-Couch Game Studio installs it from GitHub (`github:priteshvirat24/couch-engine#v1.1.1`) and uses it on both sides: the server playtests with it, and the TV plays with it.
+Couch Game Studio installs it from GitHub (`github:priteshvirat24/couch-engine#v1.2.0`) and uses it on both sides: the server playtests with it, and the TV plays with it.
 
 ## Built with
 
