@@ -6,6 +6,8 @@
 
 **If you can imagine it, you can play it.** Kids, parents, grandparents: anyone on the couch can invent a video game out loud and play the game *they* made on Fire TV, with the remote in their hand.
 
+**Try it live:** open [https://16-171-214-22.sslip.io/tv](https://16-171-214-22.sslip.io/tv/) on a laptop or TV browser (arrow keys and Enter act as the remote), then scan the QR code with your phone and say a game.
+
 ![Fire TV](https://img.shields.io/badge/Fire%20TV-Vega%20OS-ff9900?style=for-the-badge&logo=amazon&logoColor=white)
 ![Amazon Bedrock](https://img.shields.io/badge/Amazon%20Bedrock-Generative%20AI-232f3e?style=for-the-badge&logo=amazonaws&logoColor=white)
 ![React Native for Vega](https://img.shields.io/badge/React%20Native-for%20Vega-61dafb?style=for-the-badge&logo=react&logoColor=black)

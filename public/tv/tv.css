@@ -102,7 +102,8 @@ h1 { margin: 0; font-size: 76px; font-weight: 700; letter-spacing: -0.02em; line
 .join-title { display: flex; align-items: center; gap: 12px; font-size: 34px; font-weight: 600; white-space: nowrap; }
 .join-title .icon { color: var(--sun); }
 .join-how { font-size: var(--t-caption); color: var(--ink-3); margin-top: 6px; }
-.join-how b { color: var(--ink-2); font-weight: 600; }
+/* The address gets its own line, so a long host name never squeezes the title beside it. */
+.join-how b { display: block; color: var(--ink-2); font-weight: 600; }
 .join-code { margin-top: 10px; font-size: var(--t-small); color: var(--ink-3); }
 .join-code span { color: var(--sun); font-size: 46px; font-weight: 700; letter-spacing: 0.14em; margin-left: 10px; }
 .players { display: flex; gap: 10px; margin-top: 12px; min-height: 40px; flex-wrap: wrap; max-width: 560px; }

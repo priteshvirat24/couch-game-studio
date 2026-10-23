@@ -44,6 +44,7 @@
 - **GitHub repo:** https://github.com/priteshvirat24/couch-game-studio (public, Apache-2.0)
 - **Open-source engine:** https://github.com/priteshvirat24/couch-engine (public, Apache-2.0)
 - **Demo video (under 3 min, YouTube/Vimeo, public):** **TODO.**
+- **Try it live:** https://16-171-214-22.sslip.io/tv/ on a laptop or TV browser (arrow keys + Enter are the remote). Scan the QR code with any phone to make a game; the AI designer runs on Amazon Bedrock.
 
 ## Was this built during the hackathon?
 Yes. Both repositories were created and built during the submission window (October 2026).
