@@ -30,7 +30,7 @@
 - **Kid safety is layered.** Personal details (emails, phone numbers, addresses, links) are stripped before anything is stored or sent to a model; cartoon violence is softened ("kill" → "bonk", "gun" → "water blaster", "blood" → "ketchup"); unsuitable topics get a friendly nudge; names are sanitized; drawings never leave the studio server.
 - **Never a dead end.** If no model is reachable, an offline designer reads the sentence (verbs → genre, nouns → sprites via the open emojilib dictionary), so there is always a game.
 - **Built for the 10-foot screen.** A React Native for Vega app with a branded native splash screen, a 512 px icon, TTFD reporting for cold and warm starts, and a friendly retry screen. Inside: spatial D-pad navigation, one clear focus style, a 3-2-1-GO countdown, gold glow for "grab it" and red glow for "dodge it", self-hosted Fredoka type, an authored icon family and procedural chiptune music.
-- **Production-ready.** Express 5 server with CSP and security headers, per-device rate limiting, atomic storage, graceful shutdown, health checks, a non-root Docker image, and GitHub Actions CI. 24 server tests (including end-to-end API and WebSocket tests), 10 engine tests and 4 Vega app tests.
+- **Production-ready.** Express 5 server with CSP and security headers, per-device rate limiting, atomic storage, graceful shutdown, health checks, a non-root Docker image, and GitHub Actions CI. It runs live on AWS at https://16-171-214-22.sslip.io: a CloudFormation stack with a Graviton EC2 instance, HTTPS with automatic certificates, an IAM role for Bedrock (no keys on the server), and updates through Systems Manager (no SSH). 24 server tests (including end-to-end API and WebSocket tests), 10 engine tests and 4 Vega app tests.
 
 **What's next.**
 - Alexa voice input straight from the Fire TV remote.
@@ -38,7 +38,7 @@
 - Sharing family-made games between households.
 
 ## Built with
-`vega-os` `react-native-for-vega` `amazon-devices-webview` `kepler-performance-api` `amazon-devices-builder-tools` `fire-tv` `amazon-bedrock` `strands-agents` `aws-sdk` `zod` `node.js` `express` `websockets` `canvas` `web-audio` `speech-synthesis` `docker` `github-actions` `emojilib` `twemoji` `cloudflare-tunnel`
+`vega-os` `react-native-for-vega` `amazon-devices-webview` `kepler-performance-api` `amazon-devices-builder-tools` `fire-tv` `amazon-bedrock` `strands-agents` `aws-sdk` `zod` `node.js` `express` `websockets` `canvas` `web-audio` `speech-synthesis` `docker` `github-actions` `emojilib` `twemoji` `amazon-ec2` `aws-cloudformation` `caddy`
 
 ## Repo, video and links
 - **GitHub repo:** https://github.com/priteshvirat24/couch-game-studio (public, Apache-2.0)
@@ -55,6 +55,7 @@ Yes. Both repositories were created and built during the submission window (Octo
 - **Amazon Bedrock Mantle**: Bedrock's OpenAI-compatible endpoint, running open-weight models (Qwen3 235B by default, Kimi K2.5 as backup) with short-lived tokens minted from AWS credentials (`@aws/bedrock-token-generator`).
 - **Amazon Bedrock Runtime**: the Converse API with tool use and cross-region inference profiles (`@aws-sdk/client-bedrock-runtime`).
 - **Strands Agents SDK for TypeScript** (`@strands-agents/sdk`) with `OpenAIModel` + `bedrockMantleConfig`, `BedrockModel`, a custom `tool()`, and structured output.
+- **AWS CloudFormation, Amazon EC2 (Graviton), Elastic IP, AWS Systems Manager, IAM** (`infra/aws/studio.yaml`): the studio's permanent HTTPS home in eu-north-1. The instance role grants Bedrock Mantle (`AmazonBedrockMantleInferenceAccess`), so no keys live on the server; IMDSv2 only; updates ship through SSM Run Command; the stack reports success only after the public HTTPS health check passes.
 
 **How it works (a multi-step agentic pipeline):**
 1. **Safety layer** (`server/safety.js`) strips personal details and softens the words before any model sees them.
@@ -135,6 +136,7 @@ Yes. Both repositories were created and built during the submission window (Octo
 | 8 | Use the Amazon Devices Builder Tools MCP server | Connected the server per the npm README quick start; called the docs search tool | Tools work after connecting | Every tool returned `PROJECT_CONTEXT_REQUIRED` until `set_project_context` was called | Low | Called `set_project_context` first, then everything worked | Put `set_project_context` in the quick start, and include the next step in the error text |
 | 9 | Add TTFD reporting with `@amazon-devices/kepler-performance-api` | Followed the Builder Tools workflow doc: `npm install --legacy-peer-deps` | Package added, everything else unchanged | The lockfile was rewritten and the `build-vega` CLI command disappeared, so `npm run build` broke | Medium | Reinstalled with a plain `npm install`, which kept the CLI working | Drop `--legacy-peer-deps` from the instructions, or explain when it's needed |
 | 10 | Ship an icon and splash screen | Generated a project from the Vega template and built it | Template ships placeholder icon and splash assets, or the build fails clearly | The manifest references `assets/image/app_icon.png` and splash conventions, but no assets were generated; the build only warns | Low | Added a 512 px icon and `assets/raw/SplashScreenImages.zip` (1920×1080) | Generate placeholder assets in the template, or make missing assets a clear build error |
+| 11 | Put the studio behind CloudFront for a permanent HTTPS URL | CloudFormation stack with a CloudFront distribution in front of EC2 | Distribution created | `AccessDenied`: the account must be verified by AWS Support before it can add CloudFront resources | Medium | Caddy on the instance with an automatic Let's Encrypt certificate for the Elastic IP's sslip.io name | Verify new accounts automatically, or say during sign-up which services need verification |
 
 ## Feature requests (optional)
 1. **Voice input API for third-party Vega apps** (Fire TV remote mic to app speech-to-text). *Critical* for creative apps for kids: they can't type, and the remote is in their hand.

@@ -39,7 +39,7 @@ cd ~/couch-game-studio
 
 The Fire TV app is a thin shell: it opens the studio's TV page over **HTTPS** (Vega WebView blocks plain HTTP). Pick one option.
 
-**Option A: use the main studio (recommended).** The project owner runs the server with the AI game designer (Amazon Bedrock) switched on and sends you an address like `https://something.trycloudflare.com`. Skip to step 4.
+**Option A: use the main studio (recommended).** It runs on AWS with the AI game designer (Amazon Bedrock) switched on, at a permanent address: **https://16-171-214-22.sslip.io**. The app is already set to it, so skip step 4's edit and go straight to `npm install`. Check that https://16-171-214-22.sslip.io/tv/ loads in a browser first.
 
 **Option B: run your own studio on this Mac.** Do this if you're working on your own schedule. Games are made by the built-in offline designer (no AI, no AWS account needed). Everything else works the same.
 
@@ -57,6 +57,8 @@ Open `https://….trycloudflare.com/tv/` in a browser first to check that the ar
 
 ```bash
 cd vega
+# Option A: nothing to edit, src/config.ts already points at https://16-171-214-22.sslip.io
+# Option B only: point the app at your tunnel
 STUDIO=https://PASTE-THE-ADDRESS.trycloudflare.com      # no trailing slash
 sed -i '' "s#^export const STUDIO_URL = .*#export const STUDIO_URL = '$STUDIO';#" src/config.ts
 cat src/config.ts | tail -1                               # check it
@@ -67,7 +69,7 @@ npm run build                                             # about 1–2 min
 ls build/aarch64-release/                                 # couchgamestudio_aarch64.vpkg
 ```
 
-> Quick-tunnel addresses change every time `cloudflared` restarts. If the address changes, repeat step 4 (edit, then `npm run build`) and step 5.
+> Option B only: quick-tunnel addresses change every time `cloudflared` restarts. If the address changes, repeat step 4 (edit, then `npm run build`) and step 5. The Option A address never changes.
 
 ## 5. Start the Virtual Device and run the app
 
@@ -159,11 +161,11 @@ Tick each one. If something fails, note what you pressed and what you saw.
 
 | Problem | Fix |
 |---|---|
-| Black or blank screen after the splash | Open `STUDIO_URL/tv/` in a desktop browser. If it doesn't load, the server or tunnel is down, or the address in `src/config.ts` is old (redo step 4). |
+| Black or blank screen after the splash | Open `STUDIO_URL/tv/` in a desktop browser. If it doesn't load, the server or tunnel is down, or the address in `src/config.ts` is old (redo step 4). With Option A, tell the project owner. |
 | "The game studio is napping" screen | The app started but can't reach the studio. Same fix as above, then press Enter on *Try again*. |
 | `npm run build` says `build-vega` is unknown | Run `rm -rf node_modules && npm install` in `vega/` (a plain install, without `--legacy-peer-deps`). |
 | `vega` command not found | Run `source ~/vega/env` (or open a new terminal). |
-| The phone can't open the QR link | The phone needs internet access; the tunnel address works on any network. |
+| The phone can't open the QR link | The phone needs internet access; the studio address works on any network. |
 | The Virtual Device won't start | Run `vega virtual-device stop`, then start it again. Check that this Mac is Apple silicon (`uname -m` prints `arm64`). |
 | The build fails with path errors | A folder in the path has a space in its name. Move the clone to `~/couch-game-studio` and build again. |
 | "Virtual device ready", then "device offline" on install, then a crash within a minute | Go through the checklist at the start of step 5 and start the device from the Terminal app. On an M5 Mac (the log `~/vega/sdk/vega-sdk/main/<sdk>/vvd/instances/<id>/virtual_device.err` shows `detected a hanging thread 'QEMU2 CPU0 thread'`), run `bash scripts/start-virtual-device-one-core.sh` from `vega/` instead. If it still crashes, use an M1–M4 Mac or a Fire TV Stick (see above). |

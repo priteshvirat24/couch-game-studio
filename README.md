@@ -169,19 +169,18 @@ Phone links follow whatever address the TV used. Set `PUBLIC_URL` to pin one.
 
 ### On AWS (permanent HTTPS address)
 
-[`infra/aws/studio.yaml`](infra/aws/studio.yaml) is a CloudFormation stack: one Graviton EC2 instance (Amazon Linux 2023, Node 22, hardened systemd service) behind a **CloudFront** distribution that gives the studio a permanent `https://….cloudfront.net` address with WebSocket support.
+[`infra/aws/studio.yaml`](infra/aws/studio.yaml) is a CloudFormation stack: one Graviton EC2 instance with a fixed Elastic IP, running the studio as a hardened systemd service (Amazon Linux 2023, Node 22) behind **Caddy**, which gets a trusted Let's Encrypt certificate for `<elastic-ip>.sslip.io` on its own. The result is a permanent `https://` address with WebSockets, no domain needed.
 
-- The server only answers CloudFront: its security group allows the CloudFront origin-facing prefix list only, and every request must carry a secret header that CloudFront adds (kept in Secrets Manager, fetched at boot).
-- No SSH and no AWS keys on the server: it uses an IAM role for Bedrock Mantle, and Systems Manager for admin and updates. IMDSv2 only, encrypted disk.
-- Images, emoji and drawings are cached at the edge; app pages, the API and `/ws` are never cached.
-- The stack waits until `/healthz` answers before it reports success.
+- Only ports 80 and 443 are open. The Node server listens on `127.0.0.1`; there is no SSH (admin and updates go through Systems Manager).
+- No AWS keys on the server: an IAM role grants Bedrock Mantle. IMDSv2 only, encrypted disk, checksum-verified Node and Caddy downloads.
+- The stack only reports success once `https://<host>/healthz` answers with a valid certificate.
 
 ```bash
 infra/aws/deploy.sh             # create or update the stack, prints the StudioUrl (first run ~10 min)
 infra/aws/update.sh             # ship the latest main to the running server, keeping every game
 ```
 
-Then put the `StudioUrl` in `vega/src/config.ts` and rebuild the Fire TV app once; the address never changes. Running cost is roughly $10 a month (t4g.micro, Elastic IP, 16 GB disk, one secret; CloudFront traffic stays within the free allowance at family scale). Remove everything with `aws cloudformation delete-stack --stack-name couch-game-studio`, which also deletes the games stored on the server.
+Put the `StudioUrl` in `vega/src/config.ts` and rebuild the Fire TV app once; the address never changes while the stack exists. Running cost is roughly $10 a month (t4g.micro, public IPv4, 16 GB disk). `aws cloudformation delete-stack --stack-name couch-game-studio` removes everything, including the games stored on the server.
 
 ### On Fire TV (Vega OS)
 
@@ -192,7 +191,7 @@ The Vega WebView runs on the Vega Virtual Device only on Apple-silicon Macs (per
 ```bash
 # 1. Install the Vega SDK: https://developer.amazon.com/docs/vega/latest/install-vega-sdk.html
 # 2. Point the app at your studio over HTTPS (WebView blocks plain HTTP by default):
-#    vega/src/config.ts  ->  STUDIO_URL = 'https://<your-tunnel>.trycloudflare.com'
+#    vega/src/config.ts  ->  STUDIO_URL (set to the AWS studio; use your own host or tunnel to change it)
 cd vega
 npm install
 npm run build                   # armv7, aarch64 and x86_64 .vpkg files in build/
@@ -219,8 +218,8 @@ Everything is optional and set through environment variables (see [`.env.example
 | `LLM_TIMEOUT_MS` | `60000` | Time limit for one design request |
 | `PLAYTEST` | `on` | Robot playtesting of every new game (`off` to skip) |
 | `CREATE_PER_MINUTE` | `8` | Make and remix requests allowed per minute, per device |
-| `ORIGIN_SECRET` | none | Behind a CDN: reject any request without this value in `X-Origin-Verify` (`/healthz` stays open) |
-| `TRUST_PROXY` | `true` | Proxy hops in front of the server, used to find each device's IP for rate limiting (`1` behind CloudFront) |
+| `ORIGIN_SECRET` | none | Behind a CDN such as CloudFront: reject any request without this value in `X-Origin-Verify` (`/healthz` stays open) |
+| `TRUST_PROXY` | `true` | Proxy hops in front of the server, used to find each device's IP for rate limiting (`1` behind a single proxy such as Caddy) |
 
 ## Production-ready server
 
@@ -287,7 +286,7 @@ Couch Game Studio installs it from GitHub (`github:priteshvirat24/couch-engine#v
 - **AWS:** Amazon Bedrock (Mantle OpenAI-compatible endpoint with Qwen3 and Kimi K2.5, Converse API, tool use, cross-region inference profiles), Strands Agents SDK for TypeScript (`@strands-agents/sdk`), AWS SDK for JavaScript v3.
 - **Server:** Node.js 22, Express 5, `ws`, `zod`, `compression`, `qrcode`, Docker, GitHub Actions.
 - **Engine:** [couch-engine](https://github.com/priteshvirat24/couch-engine) (canvas, WebAudio).
-- Cloudflare quick tunnels for HTTPS phone links.
+- **Hosting:** AWS CloudFormation, Amazon EC2 (Graviton) with an Elastic IP, AWS Systems Manager, Caddy with Let's Encrypt. Cloudflare quick tunnels for local development.
 
 ## License and credits
 
