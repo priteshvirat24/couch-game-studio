@@ -21,7 +21,7 @@ import { RoomHub } from './rooms.js';
 import { rateLimit } from './ratelimit.js';
 import { designGame, remixGame, UnsafeRequestError } from './designer.js';
 import { llmStatus } from './llm.js';
-import { cleanName } from './safety.js';
+import { cleanName, checkText } from './safety.js';
 
 const TWEMOJI = 'https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/svg';
 const ENGINE_DIR = path.dirname(fileURLToPath(import.meta.resolve('couch-engine/engine')));
@@ -186,9 +186,12 @@ export async function createStudio(config) {
     const author = cleanName(req.body?.author, 'Someone');
     const prompt = String(req.body?.prompt || '').trim();
     if (prompt.length < 3) return res.status(400).json({ error: 'Tell me a little more about your game!' });
+    // Clean the words before the TV shows them: personal details never reach the big screen.
+    const safe = checkText(prompt);
+    if (!safe.ok) return res.status(422).json({ error: safe.reason });
     try {
       const game = await hub.exclusive(room, async () => {
-        hub.broadcast(room, { t: 'creating', prompt: prompt.slice(0, 160), author });
+        hub.broadcast(room, { t: 'creating', prompt: safe.text.slice(0, 160), author });
         try {
           const heroImage = await storeHeroImage(req.body?.heroImage);
           const made = await designGame(prompt, { heroImage, playtestEnabled: config.playtest });
@@ -217,9 +220,11 @@ export async function createStudio(config) {
     const author = cleanName(req.body?.author, 'Someone');
     const instruction = String(req.body?.instruction || '').trim();
     if (instruction.length < 2) return res.status(400).json({ error: 'What should change?' });
+    const safe = checkText(instruction, { max: 300 });
+    if (!safe.ok) return res.status(422).json({ error: safe.reason });
     try {
       const game = await hub.exclusive(room, async () => {
-        hub.broadcast(room, { t: 'creating', prompt: instruction.slice(0, 160), author, remix: true });
+        hub.broadcast(room, { t: 'creating', prompt: safe.text.slice(0, 160), author, remix: true });
         try {
           const made = await remixGame(base, instruction, { playtestEnabled: config.playtest });
           const g = await store.put({

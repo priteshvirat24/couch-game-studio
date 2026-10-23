@@ -240,7 +240,7 @@ Everything is optional and set through environment variables (see [`.env.example
 ## Tests
 
 ```bash
-npm test                        # 24 server tests
+npm test                        # 25 server tests
 npm run test:e2e                # browser end-to-end: a real TV page and phone page in Chromium
 cd vega && npm run lint && npm test    # Vega app: lint + 4 Jest tests
 ```
@@ -266,7 +266,7 @@ couch-game-studio/
 │   ├── rooms.js        TV ⇄ phone WebSocket rooms
 │   ├── ratelimit.js    per-device token bucket
 │   ├── seeds.js        starter games
-│   └── *.test.js       24 tests
+│   └── *.test.js       25 tests
 ├── public/
 │   ├── tv/             10-foot TV app
 │   ├── phone/          phone companion

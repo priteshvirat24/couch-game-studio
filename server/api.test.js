@@ -57,6 +57,24 @@ test('unsafe ideas get a friendly nudge, not a game', async () => {
   assert.match((await r.json()).error, /different kind of game/);
 });
 
+test('the TV only ever shows the cleaned words', async () => {
+  const { code } = await (await post('/api/rooms', {})).json();
+  const tv = new WebSocket(`${base.replace('http', 'ws')}/ws?room=${code}&role=tv`);
+  const got = [];
+  tv.on('message', (m) => got.push(JSON.parse(m)));
+  await new Promise((r) => tv.once('open', r));
+  const r = await post('/api/games', { room: code, prompt: 'a ninja with a gun, email me at kid@example.com' });
+  assert.equal(r.status, 201);
+  const blocked = await post('/api/games', { room: code, prompt: 'a game about beer' });
+  assert.equal(blocked.status, 422);
+  await new Promise((res) => setTimeout(res, 100));
+  const shown = got.filter((m) => m.t === 'creating').map((m) => m.prompt);
+  assert.equal(shown.length, 1, 'a declined idea never reaches the TV');
+  assert.match(shown[0], /water blaster/);
+  assert.doesNotMatch(shown[0], /@|gun|beer/);
+  tv.close();
+});
+
 test('remix keeps the original and honours "super hard"', async () => {
   const { game } = await (await post('/api/games', { prompt: 'a frog jumping over logs collecting flies' })).json();
   const r = await post(`/api/games/${game.id}/remix`, { instruction: 'make it super hard and at night' });
