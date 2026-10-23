@@ -85,6 +85,14 @@ vega virtual-device status                # wait until it's running
 vega run-app build/aarch64-release/couchgamestudio_aarch64.vpkg com.couchgamestudio.tv.main
 ```
 
+> **Apple M5 Mac?** The Virtual Device freezes and crashes about 45 seconds into boot (`status` goes back to `"running":false`, and `run-app` says "device offline" or "No connected Vega devices"). Start it on one CPU core instead and leave this running in its own terminal:
+>
+> ```bash
+> bash scripts/start-virtual-device-one-core.sh
+> ```
+>
+> In a second terminal, wait until `vega device list` shows `VirtualDevice` (about a minute), then run the `vega run-app …` line above.
+
 **Remote controls on the Virtual Device** ([Vega docs](https://developer.amazon.com/docs/vega/0.23/enable-keyboard.html)):
 
 | Remote | Keyboard |
@@ -97,7 +105,7 @@ vega run-app build/aarch64-release/couchgamestudio_aarch64.vpkg com.couchgamestu
 
 ### If the Virtual Device keeps crashing: use a real Fire TV Stick
 
-Amazon tests the Virtual Device's WebView support on M1–M4 Macs. On an **M5 Mac with macOS 26**, it has been seen to freeze and crash within a minute of every boot, even after the steps above and with software graphics. If that happens, use another M1–M4 Mac or a **Fire TV Stick 4K Select** (a Vega OS device). The same build already contains the package for the stick (`armv7`).
+Amazon tests the Virtual Device's WebView support on M1–M4 Macs. On an **M5 Mac with macOS 26**, it freezes and crashes within a minute of every boot, even after the steps above and with software graphics; starting it on one core with `scripts/start-virtual-device-one-core.sh` (above) fixed this on an M5 MacBook Air. If it still crashes, use another M1–M4 Mac or a **Fire TV Stick 4K Select** (a Vega OS device). The same build already contains the package for the stick (`armv7`).
 
 1. Plug the stick into a TV over HDMI, and into the Mac with a **USB data cable** (not a charge-only cable). Use the remote that came with the stick.
 2. On the stick: **Settings > My Fire TV > About**, press the center button on the first item seven times, then open **Developer Options**.
@@ -158,4 +166,4 @@ Tick each one. If something fails, note what you pressed and what you saw.
 | The phone can't open the QR link | The phone needs internet access; the tunnel address works on any network. |
 | The Virtual Device won't start | Run `vega virtual-device stop`, then start it again. Check that this Mac is Apple silicon (`uname -m` prints `arm64`). |
 | The build fails with path errors | A folder in the path has a space in its name. Move the clone to `~/couch-game-studio` and build again. |
-| "Virtual device ready", then "device offline" on install, then a crash within a minute | Go through the checklist at the start of step 5 and start the device from the Terminal app. If it still crashes (seen on M5 with macOS 26), use an M1–M4 Mac or a Fire TV Stick (see above). |
+| "Virtual device ready", then "device offline" on install, then a crash within a minute | Go through the checklist at the start of step 5 and start the device from the Terminal app. On an M5 Mac (the log `~/vega/sdk/vega-sdk/main/<sdk>/vvd/instances/<id>/virtual_device.err` shows `detected a hanging thread 'QEMU2 CPU0 thread'`), run `bash scripts/start-virtual-device-one-core.sh` from `vega/` instead. If it still crashes, use an M1–M4 Mac or a Fire TV Stick (see above). |
